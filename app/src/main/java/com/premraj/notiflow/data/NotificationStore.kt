@@ -278,13 +278,12 @@ class NotificationStore(context: Context) {
         val cutoff = System.currentTimeMillis() - days * 86_400_000L
         val cursor = helper.readableDatabase.rawQuery(
             """
-            SELECT COUNT(*) FROM $TABLE 
-            WHERE posted_at < ? 
-              AND pinned = 0 
-              AND is_vip = 0 
-              AND remind_at IS NULL 
-              AND (category IN ('${NotificationCategory.PROMOTION.name}', '${NotificationCategory.SPAM.name}') 
-                   OR (body LIKE '%recharge%' OR body LIKE '%cashback%' OR body LIKE '%discount%' OR body LIKE '%off%'))
+            SELECT COUNT(*) FROM $TABLE
+            WHERE posted_at < ?
+              AND pinned = 0
+              AND is_vip = 0
+              AND remind_at IS NULL
+              AND category IN ('${NotificationCategory.PROMOTION.name}', '${NotificationCategory.SPAM.name}')
             """.trimIndent(),
             arrayOf(cutoff.toString())
         )
@@ -296,12 +295,11 @@ class NotificationStore(context: Context) {
         val count = helper.writableDatabase.delete(
             TABLE,
             """
-            posted_at < ? 
-              AND pinned = 0 
-              AND is_vip = 0 
-              AND remind_at IS NULL 
-              AND (category IN ('${NotificationCategory.PROMOTION.name}', '${NotificationCategory.SPAM.name}') 
-                   OR (body LIKE '%recharge%' OR body LIKE '%cashback%' OR body LIKE '%discount%' OR body LIKE '%off%'))
+            posted_at < ?
+              AND pinned = 0
+              AND is_vip = 0
+              AND remind_at IS NULL
+              AND category IN ('${NotificationCategory.PROMOTION.name}', '${NotificationCategory.SPAM.name}')
             """.trimIndent(),
             arrayOf(cutoff.toString())
         )

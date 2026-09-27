@@ -36,8 +36,12 @@ class UserPreferences(context: Context) {
         set(value) = prefs.edit().putInt(KEY_RETENTION_DAYS, value.coerceIn(1, 365)).apply()
 
     var localAiEnabled: Boolean
-        get() = prefs.getBoolean(KEY_LOCAL_AI, false)
-        set(value) = prefs.edit().putBoolean(KEY_LOCAL_AI, value).apply()
+        get() = prefs.getBoolean(KEY_LOCAL_AI, false) &&
+            prefs.getBoolean(KEY_LOCAL_AI_CONSENT, false)
+        set(value) = prefs.edit()
+            .putBoolean(KEY_LOCAL_AI, value)
+            .putBoolean(KEY_LOCAL_AI_CONSENT, value)
+            .apply()
 
     var modelPath: String?
         get() = prefs.getString(KEY_MODEL_PATH, null)?.takeIf { it.isNotBlank() }
@@ -277,6 +281,7 @@ class UserPreferences(context: Context) {
         const val KEY_AUTO_CLEANUP = "auto_cleanup"
         const val KEY_RETENTION_DAYS = "retention_days"
         const val KEY_LOCAL_AI = "local_ai_enabled"
+        const val KEY_LOCAL_AI_CONSENT = "local_ai_explicit_consent"
         const val KEY_MODEL_PATH = "model_path"
         const val KEY_HIDE_SENSITIVE = "hide_sensitive_previews"
         const val KEY_AUTO_COPY_OTP = "auto_copy_otp"

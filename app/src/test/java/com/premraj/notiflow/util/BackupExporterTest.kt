@@ -41,5 +41,28 @@ class BackupExporterTest {
         assertTrue(csv.contains("450.5"))
         assertTrue(csv.contains("Salary"))
     }
+
+    @Test
+    fun testExportExpensesNeutralizesSpreadsheetFormulas() {
+        val transactions = listOf(
+            ExpenseTransaction(
+                id = 3L,
+                notificationId = 103L,
+                amount = 1.0,
+                transactionType = TransactionType.DEBIT,
+                merchantOrParty = "=HYPERLINK(\"https://example.invalid\",\"click\")",
+                accountRef = "+1234",
+                balanceAfter = null,
+                expenseCategory = ExpenseCategory.GENERAL,
+                timestamp = 1727320000000L
+            )
+        )
+
+        val csv = BackupExporter.exportExpensesToCsv(transactions)
+
+        assertTrue(csv.contains("\"'=HYPERLINK("))
+        assertTrue(csv.contains("\"'+1234\""))
+    }
+
 }
 

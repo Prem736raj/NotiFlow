@@ -124,6 +124,10 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun clearAllHistory() = viewModelScope.launch {
+        notifications.value.asSequence()
+            .filter { it.remindAt != null }
+            .forEach { graph.workScheduler.cancelReminder(it.id) }
+        graph.workScheduler.cancelAllReminders()
         graph.store.clearAll()
         refreshStorageStats()
     }

@@ -483,12 +483,12 @@ fun SettingsScreen(
 
             item {
                 SettingsCard(Icons.Outlined.AutoAwesome, "On-device AI Engine") {
-                    SettingSwitch(
-                        title = "Local AI refinement",
-                        subtitle = "Optional refinement for ambiguous notifications. NotiFlow never auto-downloads a model; rules-only classification remains available.",
-                        checked = prefs.localAiEnabled,
-                        onChecked = viewModel::setLocalAiEnabled
+                    Text(
+                        "Rules-only classification is active. Local AI activation is unavailable until NotiFlow has a verified model identity, integrity check, and production-ready import/acquisition flow.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    Spacer(Modifier.height(8.dp))
 
                     Surface(
                         shape = RoundedCornerShape(12.dp),

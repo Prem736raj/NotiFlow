@@ -52,16 +52,24 @@ class UserPreferences(context: Context) {
         set(value) = prefs.edit().putBoolean(KEY_HIDE_SENSITIVE, value).apply()
 
     var autoCopyOtp: Boolean
-        get() = prefs.getBoolean(KEY_AUTO_COPY_OTP, true)
-        set(value) = prefs.edit().putBoolean(KEY_AUTO_COPY_OTP, value).apply()
+        get() = prefs.getBoolean(KEY_AUTO_COPY_OTP, false) &&
+            prefs.getBoolean(KEY_AUTO_COPY_OTP_CONSENT, false)
+        set(value) = prefs.edit()
+            .putBoolean(KEY_AUTO_COPY_OTP, value)
+            .putBoolean(KEY_AUTO_COPY_OTP_CONSENT, value)
+            .apply()
 
     var antiRevokeEnabled: Boolean
         get() = prefs.getBoolean(KEY_ANTI_REVOKE_ENABLED, true)
         set(value) = prefs.edit().putBoolean(KEY_ANTI_REVOKE_ENABLED, value).apply()
 
     var expenseTrackerEnabled: Boolean
-        get() = prefs.getBoolean(KEY_EXPENSE_TRACKER_ENABLED, true)
-        set(value) = prefs.edit().putBoolean(KEY_EXPENSE_TRACKER_ENABLED, value).apply()
+        get() = prefs.getBoolean(KEY_EXPENSE_TRACKER_ENABLED, false) &&
+            prefs.getBoolean(KEY_EXPENSE_TRACKER_CONSENT, false)
+        set(value) = prefs.edit()
+            .putBoolean(KEY_EXPENSE_TRACKER_ENABLED, value)
+            .putBoolean(KEY_EXPENSE_TRACKER_CONSENT, value)
+            .apply()
 
     var unwantedCleanupPromptEnabled: Boolean
         get() = prefs.getBoolean(KEY_UNWANTED_PROMPT_ENABLED, true)
@@ -285,8 +293,10 @@ class UserPreferences(context: Context) {
         const val KEY_MODEL_PATH = "model_path"
         const val KEY_HIDE_SENSITIVE = "hide_sensitive_previews"
         const val KEY_AUTO_COPY_OTP = "auto_copy_otp"
+        const val KEY_AUTO_COPY_OTP_CONSENT = "auto_copy_otp_explicit_consent"
         const val KEY_ANTI_REVOKE_ENABLED = "anti_revoke_enabled"
         const val KEY_EXPENSE_TRACKER_ENABLED = "expense_tracker_enabled"
+        const val KEY_EXPENSE_TRACKER_CONSENT = "expense_tracker_explicit_consent"
         const val KEY_UNWANTED_PROMPT_ENABLED = "unwanted_prompt_enabled"
         const val KEY_UNWANTED_CLEANUP_DAYS = "unwanted_cleanup_days"
         const val KEY_LAST_UNWANTED_PROMPT_AT = "last_unwanted_prompt_at"

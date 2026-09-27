@@ -22,6 +22,7 @@ class WorkScheduler(
         val request = OneTimeWorkRequestBuilder<ReminderWorker>()
             .setInitialDelay(delay, TimeUnit.MILLISECONDS)
             .setInputData(workDataOf(ReminderWorker.KEY_NOTIFICATION_ID to notificationId))
+            .addTag(REMINDER_TAG)
             .build()
         workManager.enqueueUniqueWork(
             "notiflow-reminder-$notificationId",
@@ -32,6 +33,10 @@ class WorkScheduler(
 
     fun cancelReminder(notificationId: Long) {
         workManager.cancelUniqueWork("notiflow-reminder-$notificationId")
+    }
+
+    fun cancelAllReminders() {
+        workManager.cancelAllWorkByTag(REMINDER_TAG)
     }
 
     fun scheduleDigest(updateExisting: Boolean = true) {
@@ -78,6 +83,7 @@ class WorkScheduler(
     private companion object {
         const val DIGEST_WORK = "notiflow-digest"
         const val CLEANUP_WORK = "notiflow-cleanup"
+        const val REMINDER_TAG = "notiflow-reminders"
     }
 }
 

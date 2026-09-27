@@ -93,7 +93,7 @@ fun OnboardingScreen(
             Spacer(Modifier.height(12.dp))
             FeatureCard(Icons.Outlined.Schedule, "Deal with it later", "Turn any notification into a reminder instead of leaving it in your status bar.")
             Spacer(Modifier.height(12.dp))
-            FeatureCard(Icons.Outlined.AutoAwesome, "Private intelligence", "Fast rules work immediately; an optional compact ~25MB–75MB model (SmolLM) can refine ambiguous notifications on your phone.")
+            FeatureCard(Icons.Outlined.AutoAwesome, "Local rules-first intelligence", "Fast deterministic rules work without a model, network download, or cloud AI service.")
 
             Spacer(Modifier.height(24.dp))
             Card(Modifier.fillMaxWidth()) {
@@ -104,7 +104,7 @@ fun OnboardingScreen(
                     }
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "Notification content is stored locally. Core classification does not need a cloud AI API. You can clear history or disable local AI at any time.",
+                        "Captured notification content is stored locally in NotiFlow's app data. Core classification does not need a cloud AI API, and no AI model is downloaded automatically. You can clear local history from Settings.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -115,7 +115,7 @@ fun OnboardingScreen(
             Text("1 · Notification access", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(
                 if (listenerEnabled) "Enabled — NotiFlow can build your inbox."
-                else "Needed to read notifications you choose to organize.",
+                else "Notification Access lets NotiFlow read notification titles, message text, sender/app information, and other notification fields from enabled apps. This can include private messages, verification codes, and banking or payment alerts. NotiFlow uses that content to build your local inbox and rules-based features; it is not sent to a cloud AI service by this app. Expense parsing and OTP auto-copy are separate opt-in features.",
                 color = if (listenerEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(10.dp))

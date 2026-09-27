@@ -30,12 +30,27 @@ object BackupExporter {
         sb.append("ID,Timestamp,Type,Amount,MerchantOrParty,Category,AccountRef,BalanceAfter\n")
         transactions.forEach { t ->
             val dateStr = dateFormat.format(Date(t.timestamp))
-            val safeMerchant = (t.merchantOrParty ?: "Unknown").replace("\"", "\"\"")
-            val safeAccount = (t.accountRef ?: "").replace("\"", "\"\"")
+            val safeMerchant = sanitizeCsvText(t.merchantOrParty ?: "Unknown")
+            val safeAccount = sanitizeCsvText(t.accountRef ?: "")
             val balanceStr = t.balanceAfter?.toString() ?: ""
             sb.append("${t.id},\"$dateStr\",${t.transactionType.name},${t.amount},\"$safeMerchant\",${t.expenseCategory.name},\"$safeAccount\",\"$balanceStr\"\n")
         }
         return sb.toString()
+    }
+
+    private fun sanitizeCsvText(value: String): String {
+        val trimmedLeading = value.dropWhile { it.isWhitespace() }
+        val formulaSafe = if (
+            trimmedLeading.startsWith("=") ||
+            trimmedLeading.startsWith("+") ||
+            trimmedLeading.startsWith("-") ||
+            trimmedLeading.startsWith("@")
+        ) {
+            "'$value"
+        } else {
+            value
+        }
+        return formulaSafe.replace("\"", "\"\"")
     }
 
     fun createEncryptedBackup(

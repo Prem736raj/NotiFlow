@@ -68,18 +68,18 @@ class NotiFlowNotificationListener : NotificationListenerService() {
             return
         }
 
-        val graph = appGraph
-
-        // Privacy exclusion: do not capture or store notifications from excluded apps
-        if (sbn.packageName in graph.preferences.excludedPackages()) return
-
-        // Exit the main callback quickly.
+        // Exit the listener callback quickly. Preference reads and processing stay off the callback thread.
         scope.launch {
             processPosted(sbn)
         }
     }
 
     private suspend fun processPosted(sbn: StatusBarNotification) {
+        val graph = appGraph
+
+        // Privacy exclusion is enforced before any content is persisted or analyzed.
+        if (sbn.packageName in graph.preferences.excludedPackages()) return
+
         val notification = sbn.notification ?: return
         val extras = notification.extras
 
@@ -138,8 +138,6 @@ class NotiFlowNotificationListener : NotificationListenerService() {
         }.getOrElse {
             friendlyPackageFallback(sbn.packageName)
         }
-
-        val graph = appGraph
 
         val fast = LocalIntelligence.classify(
             packageName = sbn.packageName,
@@ -229,9 +227,16 @@ class NotiFlowNotificationListener : NotificationListenerService() {
             NotificationCategory.SOCIAL
         )
 
+        val sensitiveByDeterministicRules =
+            otpCode != null ||
+            fast.category in setOf(NotificationCategory.OTP, NotificationCategory.PAYMENT) ||
+            initial.category in setOf(NotificationCategory.OTP, NotificationCategory.PAYMENT)
+
         val shouldQuiet =
             (quietBySource || quietByCategory) &&
             !stored.isVip &&
+            !stored.pinned &&
+            !sensitiveByDeterministicRules &&
             LocalIntelligence.effectivePriority(stored) == NotificationPriority.LOW &&
             stored.confidence >= 0.90f &&
             safeLowValueCategory

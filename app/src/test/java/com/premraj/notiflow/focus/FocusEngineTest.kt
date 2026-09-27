@@ -14,6 +14,6 @@ class FocusEngineTest {
         assertNotNull(FocusProfileType.valueOf("WORK"))
         assertNotNull(FocusProfileType.valueOf("STUDY"))
         assertNotNull(FocusProfileType.valueOf("SLEEP"))
-        assertNotNull(FocusProfileType.valueOf("CUSTOM"))
+        assertNotNull(FocusProfileType.valueOf("QUIET_HOURS"))
     }
 }

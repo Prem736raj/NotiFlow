@@ -1,0 +1,579 @@
+AI NOTIFICATION DIGEST — DEVELOPMENT PROMPT SERIES
+==================================================
+
+Goal:
+Build a polished Android app that turns noisy notifications into an intelligent, searchable inbox with on-device AI, priority detection, scheduled digests, reminders, VIP handling, and privacy-first controls.
+
+Starting point:
+Use an existing Hello World Jetpack Compose Android Studio template project. Do not spend a prompt recreating basic Android project files that already exist.
+
+Product principles:
+- The app should feel modern, fast, premium, and trustworthy.
+- Notification content should stay on the device by default.
+- Prefer on-device intelligence. The core app must work without a paid cloud AI API.
+- The AI should be optimized for a narrow notification-understanding task rather than acting like a general chatbot.
+- Keep the experience simple enough for normal users who are not technical.
+- Use smooth animations and polished transitions where they improve clarity.
+- Avoid unnecessary features, screens, or code that are not required by the current prompt.
+- Preserve and improve existing completed features instead of rebuilding them from scratch.
+
+Total max prompts: 16
+
+
+PHASE 1 — CORE PRODUCT EXPERIENCE
+=================================
+
+PROMPT 1 — FIRST-RUN EXPERIENCE + APP HOME
+
+[COPY START]
+
+Continue from the existing Hello World Android project and turn it into the first usable version of an app called “NotiFlow” for now.
+
+The app’s purpose is to help users deal with notification overload by organizing important notifications, low-priority notifications, reminders, and digests.
+
+Create a beautiful, premium-feeling first-run experience that clearly explains:
+- what the app does
+- why it needs notification access
+- that notification content is processed privately on the device
+- that the user stays in control
+- that the core app should work without sending notification content to an external AI service
+
+Guide the user naturally into granting the notification-related access the app genuinely needs. If access is not granted, the app should still open normally and clearly explain what is unavailable instead of feeling broken.
+
+After onboarding, create the main experience with a clean overview that makes these ideas immediately understandable:
+- important notifications that may need attention
+- notifications saved for later
+- low-priority notifications waiting for the next digest
+- recently completed or archived notifications
+
+The empty state should also look intentional and premium, not unfinished.
+
+Make the overall visual design beautiful, modern, smooth, and suitable for a serious Android utility app. Support light and dark appearance automatically.
+
+Do not build future features that are not needed yet.
+
+VERIFY:
+- On first launch, I understand what the app does before granting any access.
+- I can continue even if I do not grant notification access.
+- If I grant access, the app recognizes that access is available.
+- The main experience clearly separates important, later, digest, and completed areas.
+- The app looks polished in both light and dark appearance.
+- Empty states look designed rather than broken.
+
+[COPY END]
+
+
+PROMPT 2 — LIVE NOTIFICATION INBOX
+
+[COPY START]
+
+Add the core notification inbox.
+
+When notifications arrive on the phone, the app should be able to show supported notification content inside its own history so the user can review what happened even after the original notification is gone.
+
+For each captured notification, show useful human-readable information such as:
+- app it came from
+- title or sender when available
+- notification text
+- time received
+- whether it is still active or already gone
+- whether the user has marked it important, saved it for later, or archived it
+
+The inbox should feel fast even with a large history.
+
+Handle duplicate or rapidly updated notifications intelligently so the inbox does not become cluttered with useless repeated entries.
+
+Sensitive or incomplete notifications should fail gracefully. Never make the app crash because another app sends unusual notification content.
+
+Make the browsing experience beautiful, compact, readable, and premium without overwhelming the user.
+
+VERIFY:
+- When I receive a notification from another app, I can see it inside NotiFlow.
+- Notifications show their source app, content, and received time when available.
+- Repeated updates from the same notification do not create obvious clutter.
+- Old notifications remain reviewable according to the app’s history rules.
+- Strange or incomplete notifications do not break the app.
+- Scrolling through many notifications still feels smooth.
+
+[COPY END]
+
+
+PROMPT 3 — NOTIFICATION DETAILS + BASIC ORGANIZATION
+
+[COPY START]
+
+Make each notification useful instead of being only a history entry.
+
+When I open a notification inside NotiFlow, show enough context to understand it clearly and let me organize it.
+
+I should be able to:
+- mark or unmark it as important
+- save it for later
+- mark it as done
+- archive it
+- remove it from NotiFlow history when I want
+- return to the original app when Android allows that action
+
+The user should always understand the current state of the notification.
+
+Completed and archived notifications should not keep distracting me, but they should still be recoverable through history until the user’s retention settings eventually remove them.
+
+Use smooth, premium interactions and clear visual feedback.
+
+VERIFY:
+- I can open a notification and understand its details.
+- I can mark it important and see that state reflected immediately.
+- I can save it for later, mark it done, archive it, and remove it.
+- If returning to the original app is possible, the action works naturally.
+- Moving between states feels clear and does not create duplicate entries.
+
+[COPY END]
+
+
+PROMPT 4 — SEARCH + FILTERING
+
+[COPY START]
+
+Add powerful but simple notification search and filtering.
+
+I should be able to quickly find notifications by normal words that appeared in the notification, app name, sender/title, or category once categories exist.
+
+Also let me narrow what I see using useful concepts such as:
+- important
+- saved for later
+- unread or not handled yet
+- completed
+- archived
+- source app
+- time period
+
+Search should be fast and helpful even after the app has collected a large notification history.
+
+The interface should keep the experience clean and premium rather than turning into an advanced settings tool.
+
+VERIFY:
+- Searching for a word from an old notification finds it quickly.
+- I can narrow results by app and notification state.
+- Clearing search returns me to the normal inbox.
+- Search remains usable with a large amount of history.
+- No-result states clearly explain that nothing matched.
+
+[COPY END]
+
+
+PHASE 2 — ON-DEVICE INTELLIGENCE
+================================
+
+PROMPT 5 — PRIVATE AI CLASSIFICATION
+
+[COPY START]
+
+Add on-device intelligence that understands the purpose of each notification.
+
+The app should classify notifications into practical categories such as:
+- OTP / verification
+- payment or banking
+- delivery or order
+- direct message
+- work or study
+- reminder or event
+- social
+- promotion
+- spam or low value
+- other
+
+The core classification must work on the device and must not require a paid cloud AI API.
+
+Use a small on-device model suitable for this narrow task, with Gemma 3 270M or another better current option if it produces a better Android experience. The app should prioritize privacy, reasonable storage size, good battery behavior, and fast results.
+
+Use simple deterministic recognition for very obvious cases where that is faster and more reliable, and use the on-device AI for less obvious notifications.
+
+If the model is not available, still let the app work using simpler classification until the model becomes available.
+
+Never block the notification inbox while waiting for AI processing.
+
+Show categories in a subtle, useful way.
+
+VERIFY:
+- New notifications get useful categories automatically.
+- Obvious OTP, payment, delivery, message, and promotion notifications are usually classified correctly.
+- The inbox stays responsive while classification happens.
+- The app still works if the AI model is temporarily unavailable.
+- Notification content is not sent to an external AI service for this feature.
+- Categories appear naturally without making the interface feel cluttered.
+
+[COPY END]
+
+
+PROMPT 6 — SMART PRIORITY SCORING
+
+[COPY START]
+
+Teach the app to decide which notifications deserve attention now.
+
+Each notification should get a practical priority such as high, normal, or low based on its content, category, source, recency, and the user’s preferences.
+
+Examples:
+- urgent direct messages, important account warnings, security alerts, payment failures, upcoming deadlines, and critical delivery issues may deserve higher priority
+- ordinary social activity and marketing should normally be lower priority
+- OTP notifications can be time-sensitive without needing to stay important forever
+
+The system should avoid being dramatic. “High priority” should be reserved for notifications that are genuinely more likely to need attention.
+
+Let the user override the app’s decision, and remember their preference when appropriate.
+
+Use the priority result to improve the main overview so important items naturally rise above noise.
+
+VERIFY:
+- Important notifications appear ahead of low-value noise.
+- Marketing notifications do not usually get treated as urgent.
+- Time-sensitive items can become more prominent when appropriate.
+- I can correct the priority when the app gets it wrong.
+- My correction is reflected immediately.
+- Priority feels useful rather than overly aggressive.
+
+[COPY END]
+
+
+PROMPT 7 — USER CORRECTIONS + PERSONAL LEARNING
+
+[COPY START]
+
+Make the intelligence adapt to the individual user.
+
+Whenever the app classifies or prioritizes a notification incorrectly, I should be able to correct it easily.
+
+Over time, the app should use these corrections and simple user preferences to make better decisions for that person without requiring them to train a model manually.
+
+Examples:
+- always treat notifications from a certain app as low priority
+- always treat a certain sender or conversation as important
+- treat a certain type of banking notification as important
+- stop treating a recurring promotional pattern as important
+
+Make these controls understandable in normal language.
+
+Give the user a place to review and remove learned preferences so the system never feels mysterious or uncontrollable.
+
+VERIFY:
+- I can correct a wrong category or priority.
+- Repeated similar notifications follow my preference when reasonable.
+- I can see the preferences the app has learned.
+- I can remove a learned preference.
+- The app still behaves predictably after preferences are changed.
+
+[COPY END]
+
+
+PHASE 3 — DIGEST + INTERRUPTION CONTROL
+=======================================
+
+PROMPT 8 — SMART DIGESTS
+
+[COPY START]
+
+Add notification digests that summarize low-priority activity without making users open the app constantly.
+
+Let the user choose when they want digests, such as morning, afternoon, evening, or their own preferred schedule.
+
+A digest should group related activity into a useful summary, for example:
+- 5 social notifications
+- 3 promotions
+- 2 deliveries with status updates
+- 1 payment notification
+- 2 messages that may need attention
+
+The digest should highlight genuinely important items separately instead of hiding them inside a summary.
+
+Create concise natural-language summaries on the device where practical. If the local AI cannot produce a good summary on a particular device, fall back to a clean structured summary rather than requiring cloud AI.
+
+Opening a digest should make it easy to review the notifications that created it.
+
+VERIFY:
+- I can choose when digests are delivered.
+- Low-priority notifications can wait for a digest instead of constantly interrupting me.
+- Important notifications are not hidden just because digest mode is enabled.
+- A digest gives me a useful overview of what happened.
+- I can open the digest and review the original notifications.
+- Digests still work without a cloud AI service.
+
+[COPY END]
+
+
+PROMPT 9 — SMART BATCHING + QUIET NOTIFICATION FLOW
+
+[COPY START]
+
+Add a mode that reduces interruptions from selected low-priority sources.
+
+The user should be able to choose apps or notification categories that they do not want to be interrupted by immediately.
+
+Instead, those notifications should be collected and surfaced through NotiFlow at sensible times or inside the next digest.
+
+Do not interfere with notifications that the user has marked important, notifications from VIP people, or genuinely urgent alerts.
+
+Make it very clear what NotiFlow can and cannot control because Android may restrict how third-party apps can affect another app’s notifications.
+
+Never pretend a notification was blocked if Android did not actually allow that behavior. Use the best privacy-respecting experience the platform allows.
+
+VERIFY:
+- I can choose which sources should be quieter.
+- Low-priority sources stop dominating my NotiFlow experience.
+- Important and VIP notifications still stand out immediately.
+- The app clearly communicates Android limitations instead of behaving unpredictably.
+- I can easily return a source to normal behavior.
+
+[COPY END]
+
+
+PHASE 4 — “DEAL WITH IT LATER”
+==============================
+
+PROMPT 10 — REMIND ME LATER
+
+[COPY START]
+
+Turn notifications into things I can intentionally deal with later.
+
+From any useful notification, let me choose to be reminded:
+- later today
+- tomorrow
+- on a future day
+- at a custom date and time
+
+When the reminder appears, show enough of the original notification context that I immediately remember what it was about.
+
+A notification saved for later should have a clear state in NotiFlow so I can review all pending reminders in one place.
+
+If I reschedule, complete, or cancel a reminder, the app should update everywhere consistently.
+
+Make the experience extremely fast because this should be one of the app’s most-used actions.
+
+VERIFY:
+- I can save a notification for later in only a few steps.
+- The reminder appears at the expected time with the original context.
+- I can see all pending notification reminders together.
+- I can reschedule, complete, or cancel them.
+- Completed reminders stop appearing as pending.
+- Reopening the app does not lose scheduled reminders.
+
+[COPY END]
+
+
+PROMPT 11 — VIP PEOPLE + IMPORTANT SOURCES
+
+[COPY START]
+
+Add VIP handling for people and sources that should rarely be missed.
+
+Let users mark important senders, conversations, or source apps as VIP when enough identifying information is available from the notification.
+
+VIP notifications should stand out clearly and should not be buried in low-priority digests.
+
+The user should be able to manage their VIP list and remove entries at any time.
+
+Avoid making broad assumptions. For example, making one person VIP should not automatically make every notification from the entire app urgent.
+
+Keep privacy in mind and only use information that the notification itself legitimately exposes.
+
+VERIFY:
+- I can mark an appropriate sender or source as VIP.
+- Future matching notifications are clearly prioritized.
+- VIP notifications do not disappear into low-priority digests.
+- I can view and edit my VIP list.
+- Removing a VIP preference changes future behavior.
+- The app does not accidentally mark an entire app as VIP when I only selected one person.
+
+[COPY END]
+
+
+PHASE 5 — SMART ACTIONS
+=======================
+
+PROMPT 12 — ACTION EXTRACTION
+
+[COPY START]
+
+Make notifications actionable.
+
+When a notification contains useful information, detect practical actions such as:
+- a date or event that may belong on the calendar
+- a phone number that can be called
+- an address that can be opened in maps
+- a web link that can be opened or saved
+- a payment due date that can become a reminder
+- a delivery update that can be saved for later
+- a verification code that can be copied quickly
+
+Only suggest actions when confidence is high enough that the suggestion feels helpful rather than annoying.
+
+The app should never perform consequential actions automatically without the user choosing them.
+
+Make suggested actions feel clean and contextual.
+
+VERIFY:
+- A notification with an address gives me a useful map-related action.
+- A notification with a date can offer an appropriate calendar/reminder action.
+- OTP or verification notifications can make the code easy to use.
+- Random text does not constantly produce irrelevant suggestions.
+- Nothing consequential happens without my action.
+
+[COPY END]
+
+
+PROMPT 13 — NATURAL LANGUAGE NOTIFICATION SEARCH
+
+[COPY START]
+
+Add an intelligent search mode that lets me find notifications using normal language rather than exact keywords.
+
+Examples:
+- “show my Amazon delivery notifications from last week”
+- “find the payment around 2000 rupees”
+- “messages I saved for later”
+- “important banking alerts from yesterday”
+- “notifications about tomorrow’s event”
+
+The experience should work primarily from information stored on the device.
+
+Use local intelligence where it meaningfully improves understanding, but keep normal keyword search fast and available as a fallback.
+
+This feature is search, not a chatbot. Keep responses focused on finding and showing matching notifications.
+
+VERIFY:
+- I can search using a normal sentence instead of remembering exact wording.
+- Date phrases such as yesterday or last week are understood sensibly.
+- Searching for an amount can find relevant payment notifications.
+- Results show the matching real notifications, not invented answers.
+- If intelligent interpretation fails, normal search still works.
+
+[COPY END]
+
+
+PHASE 6 — CLEANUP, PRIVACY, AND CONTROL
+=======================================
+
+PROMPT 14 — SMART AUTO-CLEAN
+
+[COPY START]
+
+Add optional automatic cleanup so the notification history does not grow forever.
+
+Give users simple choices for handling temporary notification types, especially:
+- expired OTPs
+- old promotions
+- stale delivery updates
+- completed reminders
+- old low-priority notifications
+
+Let users choose sensible retention periods and clearly explain what will be removed.
+
+Never automatically remove notifications the user has pinned, marked important, or saved for later unless they explicitly allow it.
+
+Include a way to review storage usage and manually clean old notification history.
+
+VERIFY:
+- I can choose whether automatic cleanup is enabled.
+- Old temporary notifications can disappear automatically according to my settings.
+- Important, pinned, and saved-for-later items are protected by default.
+- I can manually clean old data.
+- I can see roughly how much local history the app is keeping.
+- Cleanup does not unexpectedly remove recent important information.
+
+[COPY END]
+
+
+PROMPT 15 — PRIVACY + DATA CONTROL
+
+[COPY START]
+
+Create a strong privacy and data-control experience.
+
+The app deals with highly sensitive notification content, so users should be able to clearly understand:
+- what NotiFlow can read
+- what is stored
+- whether any AI processing leaves the device
+- how long notification history is kept
+- what happens when the AI model is enabled or disabled
+
+Give users straightforward controls to:
+- delete all notification history
+- delete selected history
+- clear learned preferences
+- disable local AI processing if they want
+- remove downloaded AI model data if applicable
+- choose retention behavior
+
+Protect sensitive content from unnecessary exposure inside the app where appropriate.
+
+Do not claim absolute security or privacy guarantees that the app cannot prove.
+
+Make this area feel transparent and trustworthy rather than legalistic.
+
+VERIFY:
+- I can understand what data stays on my phone.
+- I can delete my notification history.
+- I can clear learned preferences independently.
+- I can disable AI-related processing and the app still remains usable.
+- If model files take storage, I can see and remove them.
+- Privacy explanations are clear and not misleading.
+
+[COPY END]
+
+
+PHASE 7 — RELEASE-QUALITY POLISH
+================================
+
+PROMPT 16 — FINAL PRODUCT POLISH + REAL-WORLD EDGE CASES
+
+[COPY START]
+
+Treat the current app as a product that is about to be released to real Android users.
+
+Review the complete experience and polish it without adding unrelated major features.
+
+Focus on:
+- premium visual consistency
+- smooth animations and transitions
+- fast startup and responsive scrolling
+- graceful loading and empty states
+- clear handling when notification access is removed later
+- clear handling when the local AI model is unavailable or still becoming ready
+- offline behavior
+- battery-conscious background behavior
+- large notification histories
+- duplicate notification updates
+- notifications with missing titles, icons, sender names, or text
+- device restart behavior
+- scheduled reminders surviving normal real-world usage
+- readable light and dark appearance
+- accessibility, text scaling, contrast, and touch usability
+- understandable error messages
+- no fake data appearing in production screens
+- no unfinished placeholder text
+- no confusing developer-facing wording shown to users
+
+Also review the onboarding so a new user quickly understands the value:
+“Important now, deal with some later, digest the noise.”
+
+Do not redesign working parts just for the sake of redesigning them. Improve what exists and make the complete product feel cohesive.
+
+VERIFY:
+- I can install the app fresh and understand it without explanation.
+- Notification capture, categories, priority, reminders, VIPs, digests, search, and cleanup work together coherently.
+- The app remains useful without internet access.
+- Removing and restoring notification access is handled gracefully.
+- Restarting the phone does not obviously break important user expectations.
+- Large histories still feel responsive.
+- Light mode, dark mode, and larger text remain usable.
+- There are no obvious placeholder screens, fake content, or unfinished messages.
+- The app feels like one polished product rather than 16 separate features.
+
+[COPY END]
+
+
+END OF DEVELOPMENT PROMPT SERIES
+================================
+
+Suggested build order:
+Run the prompts in order. After each prompt, manually perform its VERIFY section before moving to the next one. If something from an earlier phase breaks, fix that regression before adding the next feature.

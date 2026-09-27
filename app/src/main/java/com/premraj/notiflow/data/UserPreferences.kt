@@ -36,7 +36,7 @@ class UserPreferences(context: Context) {
         set(value) = prefs.edit().putInt(KEY_RETENTION_DAYS, value.coerceIn(1, 365)).apply()
 
     var localAiEnabled: Boolean
-        get() = prefs.getBoolean(KEY_LOCAL_AI, true)
+        get() = prefs.getBoolean(KEY_LOCAL_AI, false)
         set(value) = prefs.edit().putBoolean(KEY_LOCAL_AI, value).apply()
 
     var modelPath: String?

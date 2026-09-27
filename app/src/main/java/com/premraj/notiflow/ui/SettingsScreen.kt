@@ -286,15 +286,15 @@ fun SettingsScreen(
                     HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
                     SettingSwitch(
-                        title = "Sleep schedule focus (11 PM - 7 AM)",
-                        subtitle = "Automatically silence all notifications at night except VIP calls & OTPs.",
+                        title = "Sleep schedule profile (11 PM - 7 AM)",
+                        subtitle = "Marks the sleep focus profile active during this schedule. Notification suppression is not yet enforced.",
                         checked = prefs.sleepFocusScheduled,
                         onChecked = viewModel::setSleepFocusScheduled
                     )
 
                     SettingSwitch(
-                        title = "Work hours focus (Mon-Fri, 9 AM - 5 PM)",
-                        subtitle = "Mute social, gaming, and entertainment alerts during office hours.",
+                        title = "Work hours profile (Mon-Fri, 9 AM - 5 PM)",
+                        subtitle = "Marks the work focus profile active during office hours. Notification suppression is not yet enforced.",
                         checked = prefs.workFocusScheduled,
                         onChecked = viewModel::setWorkFocusScheduled
                     )
@@ -311,8 +311,8 @@ fun SettingsScreen(
                     )
 
                     SettingSwitch(
-                        title = "Driving mode",
-                        subtitle = "Forces hands-free announcements aloud (via car Bluetooth or speaker) while you are driving.",
+                        title = "Manual driving mode",
+                        subtitle = "When you turn this on, driving-or-headphones rules may allow announcements. NotiFlow does not detect driving automatically.",
                         checked = prefs.drivingModeActive,
                         onChecked = viewModel::setDrivingModeActive
                     )
@@ -455,7 +455,7 @@ fun SettingsScreen(
             item {
                 SettingsCard(Icons.Outlined.Security, "VIPs") {
                     Text(
-                        "VIP contacts and applications are always elevated to High priority and never silenced by focus modes.",
+                        "VIP contacts and applications are elevated to High priority and protected from NotiFlow's current quiet-source cancellation policy.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -548,11 +548,11 @@ fun SettingsScreen(
                         checked = prefs.autoCopyOtp,
                         onChecked = viewModel::setAutoCopyOtp
                     )
-                    SettingSwitch(
-                        title = "Preserve captured message history",
-                        subtitle = "Keeps captured WhatsApp & Telegram notification history after source notifications disappear. NotiFlow does not claim to detect why a sender notification was removed.",
-                        checked = prefs.antiRevokeEnabled,
-                        onChecked = viewModel::setAntiRevokeEnabled
+                    Text(
+                        "Captured notification history remains available after a source notification disappears. Android removal callbacks do not reliably prove that a sender used “Delete for everyone”.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 7.dp)
                     )
                     SettingSwitch(
                         title = "Smart Bank & UPI Expense Tracker",

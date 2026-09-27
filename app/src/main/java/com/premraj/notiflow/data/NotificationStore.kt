@@ -31,7 +31,8 @@ class NotificationStore(context: Context) {
     suspend fun upsertIncoming(
         incoming: IncomingNotification,
         classification: ClassificationResult,
-        isVip: Boolean
+        isVip: Boolean,
+        expenseTrackingEnabled: Boolean
     ): Long = withContext(Dispatchers.IO) {
         val db = helper.writableDatabase
         val existing = findByKey(db, incoming.key)
@@ -68,28 +69,29 @@ class NotificationStore(context: Context) {
             existing.id
         }
 
-        // On-device financial parsing for UPI & Bank transactions
-        val parsedExpense = ExpenseParser.parse(
-            title = incoming.title,
-            body = incoming.body,
-            packageName = incoming.packageName,
-            appName = incoming.appName,
-            notificationId = id,
-            timestamp = incoming.postedAt
-        )
+        if (expenseTrackingEnabled) {
+            val parsedExpense = ExpenseParser.parse(
+                title = incoming.title,
+                body = incoming.body,
+                packageName = incoming.packageName,
+                appName = incoming.appName,
+                notificationId = id,
+                timestamp = incoming.postedAt
+            )
 
-        if (parsedExpense != null) {
-            val expValues = ContentValues().apply {
-                put("notification_id", id)
-                put("amount", parsedExpense.amount)
-                put("transaction_type", parsedExpense.transactionType.name)
-                putNullable("merchant_or_party", parsedExpense.merchantOrParty)
-                putNullable("account_ref", parsedExpense.accountRef)
-                if (parsedExpense.balanceAfter != null) put("balance_after", parsedExpense.balanceAfter) else putNull("balance_after")
-                put("expense_category", parsedExpense.expenseCategory.name)
-                put("timestamp", incoming.postedAt)
+            if (parsedExpense != null) {
+                val expValues = ContentValues().apply {
+                    put("notification_id", id)
+                    put("amount", parsedExpense.amount)
+                    put("transaction_type", parsedExpense.transactionType.name)
+                    putNullable("merchant_or_party", parsedExpense.merchantOrParty)
+                    putNullable("account_ref", parsedExpense.accountRef)
+                    if (parsedExpense.balanceAfter != null) put("balance_after", parsedExpense.balanceAfter) else putNull("balance_after")
+                    put("expense_category", parsedExpense.expenseCategory.name)
+                    put("timestamp", incoming.postedAt)
+                }
+                db.insertWithOnConflict(TABLE_EXPENSES, null, expValues, SQLiteDatabase.CONFLICT_REPLACE)
             }
-            db.insertWithOnConflict(TABLE_EXPENSES, null, expValues, SQLiteDatabase.CONFLICT_REPLACE)
         }
 
         refresh()
@@ -501,7 +503,6 @@ class NotificationStore(context: Context) {
             }
             if (oldVersion < 3) {
                 createExpenseTable(db)
-                retroactivelyParseExpenses(db)
             }
         }
 
@@ -527,35 +528,7 @@ class NotificationStore(context: Context) {
             db.execSQL("CREATE INDEX IF NOT EXISTS idx_expenses_notif_id ON $TABLE_EXPENSES(notification_id)")
         }
 
-        private fun retroactivelyParseExpenses(db: SQLiteDatabase) {
-            runCatching {
-                db.rawQuery("SELECT id, title, body, package_name, app_name, posted_at FROM $TABLE", null).use { cursor ->
-                    while (cursor.moveToNext()) {
-                        val id = cursor.getLong(0)
-                        val title = if (cursor.isNull(1)) null else cursor.getString(1)
-                        val body = if (cursor.isNull(2)) null else cursor.getString(2)
-                        val pkg = cursor.getString(3)
-                        val appName = cursor.getString(4)
-                        val postedAt = cursor.getLong(5)
 
-                        val parsed = ExpenseParser.parse(title, body, pkg, appName, id, postedAt)
-                        if (parsed != null) {
-                            val values = ContentValues().apply {
-                                put("notification_id", id)
-                                put("amount", parsed.amount)
-                                put("transaction_type", parsed.transactionType.name)
-                                if (parsed.merchantOrParty != null) put("merchant_or_party", parsed.merchantOrParty) else putNull("merchant_or_party")
-                                if (parsed.accountRef != null) put("account_ref", parsed.accountRef) else putNull("account_ref")
-                                if (parsed.balanceAfter != null) put("balance_after", parsed.balanceAfter) else putNull("balance_after")
-                                put("expense_category", parsed.expenseCategory.name)
-                                put("timestamp", postedAt)
-                            }
-                            db.insertWithOnConflict(TABLE_EXPENSES, null, values, SQLiteDatabase.CONFLICT_REPLACE)
-                        }
-                    }
-                }
-            }
-        }
     }
 
     private companion object {

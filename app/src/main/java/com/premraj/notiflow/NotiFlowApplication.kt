@@ -20,8 +20,6 @@ class NotiFlowApplication : Application() {
         NotificationChannels.create(this)
         graph.workScheduler.ensureCleanupScheduled()
         if (graph.preferences.digestEnabled) graph.workScheduler.scheduleDigest(updateExisting = false)
-        // Automatically download AI model on app install & launch
-        graph.modelDownloader.autoStartDownloadIfNeeded()
     }
 }
 

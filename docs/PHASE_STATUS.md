@@ -1,20 +1,32 @@
 # Development phase status
 
-| Phase | Status | Main implementation |
+This file is a status index, not proof. Runtime/build proof must come from CI, tests, and physical-device verification.
+
+| Phase | Status | Current source truth |
 |---|---|---|
-| 1 | Complete | onboarding, access guidance, premium home, dark/light |
-| 2 | Complete | notification listener, persistent history, duplicate upsert |
-| 3 | Complete | detail actions, pin/VIP, later/done/archive/delete, restore |
-| 4 | Complete | keyword + structured filters |
-| 5 | Complete | rules-first classifier + optional local Gemma `.task` refinement |
-| 6 | Complete | priority scoring + time-sensitive OTP decay |
-| 7 | Complete | learned user corrections with review/remove controls |
-| 8 | Complete | scheduled local digest + optional local LLM summary |
-| 9 | Complete | quiet apps/categories with VIP/important protection |
-| 10 | Complete | persisted reminders via WorkManager |
-| 11 | Complete | VIP senders + VIP source apps |
-| 12 | Complete | smart action extraction |
-| 13 | Complete | natural-language local search |
-| 14 | Complete | retention + temporary-data cleanup |
-| 15 | Complete | privacy/data/model controls, backup disabled |
-| 16 | Complete in code | final device/Gradle verification still required in an Android SDK environment |
+| 1 | 🟡 Partial | onboarding/access UI exists; device permission/revoke/rebind behavior still needs device verification |
+| 2 | 🟡 Partial | listener, SQLite history, duplicate-key upsert exist; OEM/runtime verification remains |
+| 3 | 🟡 Partial | detail/state/pin/VIP/later/delete exist; archive restore is not a full notification-history restore |
+| 4 | ✅ Source-verified | keyword + structured filters implemented; scale benchmarking still pending |
+| 5 | 🟡 Partial | rules-first classifier works without AI; model acquisition/import compatibility is not production-ready |
+| 6 | 🧪 Insufficiently tested | priority scoring/OTP decay code exists; broader false-positive corpus is pending |
+| 7 | ✅ Source-verified | learned per-source/per-sender corrections and removal controls exist |
+| 8 | 🟡 Partial | WorkManager digest exists; exact-clock delivery is not promised and device scheduling remains unverified |
+| 9 | ⚠️ Guarded | quiet cancellation exists with VIP/pinned/sensitive/category/confidence guards; OEM/device tests required |
+| 10 | 🟡 Partial | WorkManager reminders exist and clear-all now cancels reminder work; device tests required |
+| 11 | ✅ Source-verified | VIP sender/app rules exist and current quiet cancellation protects VIP items |
+| 12 | 🧪 Insufficiently tested | smart-action extraction exists; malicious URI/date/locale coverage remains |
+| 13 | 🟡 Partial | rule-based natural-language interpretation exists; do not describe it as semantic vector search |
+| 14 | ⚠️ Guarded | retention/cleanup exists; destructive broad “%off%” deletion was removed |
+| 15 | 🟡 Partial | privacy controls improved; DB-at-rest threat model, complete restore, and full data-deletion semantics remain |
+| 16 | 🧪 Insufficiently tested | CI workflow added on hardening branch; no successful CI/device/release proof recorded yet |
+
+## Status legend
+
+- ✅ Source-verified: implementation is present and internally consistent in source; may still have separate device gates.
+- ⚠️ Guarded: works in source with important safety constraints or known limitations.
+- 🟡 Partial: meaningful implementation exists but is not end-to-end complete.
+- ❌ Broken: confirmed nonfunctional.
+- 🚫 Missing: no implementation.
+- 🧪 Insufficiently tested: implementation exists but proof is not adequate.
+- ❓ Device verification required: cannot be proven from JVM/source review alone.

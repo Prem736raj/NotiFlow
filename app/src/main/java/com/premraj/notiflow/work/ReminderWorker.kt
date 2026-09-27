@@ -13,6 +13,7 @@ import androidx.work.WorkerParameters
 import com.premraj.notiflow.MainActivity
 import com.premraj.notiflow.R
 import com.premraj.notiflow.appGraph
+import com.premraj.notiflow.data.NotificationCategory
 import com.premraj.notiflow.data.NotificationState
 import com.premraj.notiflow.util.NotificationChannels
 
@@ -37,14 +38,32 @@ class ReminderWorker(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val isSensitive = item.category in setOf(
+            NotificationCategory.OTP,
+            NotificationCategory.PAYMENT
+        )
+        val hideContent = applicationContext.appGraph.preferences.hideSensitivePreviews && isSensitive
+
+        val publicVersion = NotificationCompat.Builder(applicationContext, NotificationChannels.REMINDERS)
+            .setSmallIcon(R.drawable.ic_notiflow)
+            .setContentTitle("NotiFlow reminder")
+            .setContentText("Open NotiFlow to view reminder details")
+            .build()
+
         val notification = NotificationCompat.Builder(applicationContext, NotificationChannels.REMINDERS)
             .setSmallIcon(R.drawable.ic_notiflow)
-            .setContentTitle("Reminder · ${item.appName}")
-            .setContentText(item.displayTitle)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(item.displayBody))
+            .setContentTitle(if (hideContent) "NotiFlow reminder" else "Reminder · ${item.appName}")
+            .setContentText(if (hideContent) "Open NotiFlow to view this sensitive reminder" else item.displayTitle)
+            .setStyle(
+                NotificationCompat.BigTextStyle().bigText(
+                    if (hideContent) "Sensitive notification content is hidden." else item.displayBody
+                )
+            )
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPublicVersion(publicVersion)
             .build()
 
         if (ActivityCompat.checkSelfPermission(applicationContext, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {

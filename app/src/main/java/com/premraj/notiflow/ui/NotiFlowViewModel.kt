@@ -332,7 +332,7 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
         bumpPrefs()
     }
 
-    fun createEncryptedBackup(password: String = "notiflow-local"): String {
+    fun createEncryptedBackup(password: String): String {
         return BackupExporter.createEncryptedBackup(
             notifications = notifications.value,
             preferences = graph.preferences,
@@ -340,9 +340,12 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
         )
     }
 
-    fun restoreBackup(encryptedText: String, password: String = "notiflow-local"): Result<Int> {
+    fun restoreBackup(encryptedText: String, password: String): Result<Int> {
         val result = BackupExporter.decryptBackup(encryptedText, password)
         return result.map { json ->
+            require(json.optInt("version", -1) == 1) { "Unsupported backup version" }
+
+            var restoredVipRules = 0
             val vipRules = json.optJSONArray("vip_rules")
             if (vipRules != null) {
                 for (i in 0 until vipRules.length()) {
@@ -350,11 +353,14 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
                     val pkg = token.substringBefore('|')
                     val sender = token.substringAfter('|').takeIf { it.isNotBlank() }
                     graph.preferences.setVip(pkg, sender, true)
+                    restoredVipRules += 1
                 }
             }
             bumpPrefs()
             refreshStorageStats()
-            json.optJSONArray("notifications")?.length() ?: 0
+
+            // Notification records are not restored by the current v1 archive format.
+            restoredVipRules
         }
     }
 

@@ -1,81 +1,88 @@
 # NotiFlow
 
-NotiFlow is a privacy-first Android notification inbox that helps users separate what matters now from what can wait.
+NotiFlow is an Android notification inbox focused on local-first notification history, rules-based prioritization, reminders, search, and privacy controls.
 
-**Product line:** Important now. Deal with some later. Digest the noise.
+> Production status: **hardening in progress**. The current source is the source of truth; feature names and earlier phase-completion documents are not proof of runtime behavior.
 
-## What is implemented
+## Current implementation truth
 
-All 16 planned phases are represented in the app:
+### Verified in source
 
-1. Premium onboarding that works even when access is declined.
-2. Persistent notification inbox using Android notification-listener access.
-3. Notification detail, important state, pinning, later/done/archive/delete, and source-app return when available.
-4. Keyword search plus app/category/state/priority filters.
-5. Rules-first on-device classification with optional local Gemma refinement.
-6. Smart priority scoring with OTP priority decay.
-7. User corrections and learned per-source/per-sender preferences.
-8. Scheduled daily digest with structured local fallback and optional local-model summary.
-9. Quiet sources and quiet categories, while protecting important/VIP items.
-10. Notification reminders backed by WorkManager.
-11. VIP senders and VIP apps.
-12. Smart extraction for OTP codes, links, phone numbers, addresses, dates/calendar events, and reminders.
-13. Natural-language notification search such as "Amazon delivery from last week" or "payment around 2000 rupees".
-14. Automatic cleanup with faster expiry for OTPs/promotions/spam and retention controls.
-15. Privacy controls, local data deletion, learned-rule deletion, AI disable/remove-model controls, and sensitive-preview masking.
-16. Release-oriented states for missing permissions, missing models, offline use, duplicates, device restart persistence, large history, light/dark appearance, and accessibility-friendly Compose layouts.
+- NotificationListenerService-based capture with excluded-package gating.
+- Persistent SQLite notification history with update-by-notification-key behavior.
+- Rules-first local classification; the core path does not require cloud AI.
+- Pin, state, reminder, VIP, learned preference, search, digest, cleanup, and expense-domain code exists.
+- Group-summary and ongoing/foreground-service notifications are filtered before persistence.
+- Quiet-source/category cancellation is restricted to final, high-confidence low-priority promotion/spam/social classifications and protects VIP, pinned, OTP, and payment signals.
+- OTP clipboard content is marked sensitive on supported Android versions, and OTP auto-copy is opt-in.
+- Android app backup is disabled with `android:allowBackup="false"`.
+- Gradle wrapper files are committed.
+
+### Partial or intentionally constrained
+
+- **Focus profiles:** manual and scheduled status are implemented, but focus-based notification suppression is intentionally not enforced until its policy is device-tested.
+- **Local AI:** MediaPipe `tasks-genai:0.10.27` integration remains isolated behind `GemmaClassifier`. Automatic network model download is disabled. The current app has no production-ready verified model-import/acquisition flow, so rules-only mode is the safe default.
+- **Restore:** the current v1 encrypted archive can decrypt and restore VIP rules, but does not restore notification history. UI does not claim a completed notification restore.
+- **Anti-revoke:** NotiFlow preserves captured notification history after a source notification disappears; it does **not** claim to prove a sender used “Delete for everyone.”
+- **Voice reader:** incoming notifications are wired to the TTS policy engine, but real routing/OEM/device behavior still requires physical-device verification.
 
 ## Privacy model
 
-- Notification history is stored locally in the app database.
-- Android cloud backup is disabled for the app.
-- Core classification works without a cloud service or paid API.
-- No notification text is sent to an external AI service by this codebase.
-- The optional Gemma model is stored in app-private storage after the user imports it.
-- Removing the model does not break the rules-first classifier.
+Notification content is stored locally in the app database. The current classifier has no cloud-inference fallback. Optional local AI is disabled unless the user explicitly enables it, and no automatic model network acquisition occurs.
 
-## Optional local AI
+Sensitive controls are opt-in where they create additional derived/exposed data:
 
-The app is useful without any model. When the user imports a compatible Gemma `.task` model, ambiguous notifications can be refined and digests can use local text generation.
+- OTP auto-copy: off until explicit user consent.
+- Expense parsing: off until explicit user consent.
+- Local AI: off until explicit user consent.
 
-The project currently uses the known MediaPipe Tasks GenAI Android API behind one isolated `GemmaClassifier` file. This keeps the rest of the app independent from the model runtime and makes a later runtime migration straightforward.
+Turning expense parsing off stops new derived financial rows; existing derived rows remain until the user deletes local history.
 
-A Gemma 3 270M mobile `.task` model is roughly hundreds of MB, so it is intentionally **not bundled in the APK**. This avoids forcing every user to download a large model before they can use the app.
+## Build baseline
 
-## Android/build baseline
+Current build configuration:
 
 - `compileSdk`: 37
 - `targetSdk`: 37
 - `minSdk`: 24
 - Android Gradle Plugin: 9.4.0
-- Compose BOM: 2026.09.00
+- Kotlin Compose plugin: 2.4.10
+- Gradle wrapper: 9.6.0
 - Java: 17
+- Compose BOM: 2026.09.00
 - WorkManager: 2.12.0
+- MediaPipe Tasks GenAI: 0.10.27
+- app version: 0.1.0 (versionCode 1)
 
-This folder was generated while the live Android Studio tunnel was unavailable. It intentionally does not include a Gradle wrapper binary. The original plan assumes an existing Hello World Compose template; use that template's wrapper, or configure Gradle 9.6 in Android Studio for AGP 9.4.
+The wrapper is present: `gradlew`, `gradlew.bat`, `gradle/wrapper/gradle-wrapper.jar`, and `gradle-wrapper.properties`.
 
-## First device run
+## Build and test
 
-1. Open/sync the project in Android Studio.
-2. Install on a physical Android phone.
-3. Launch NotiFlow and grant notification-listener access.
-4. Allow NotiFlow notifications if you want reminders/digests.
-5. Receive a few notifications and verify the inbox/categories.
-6. Optionally import a compatible Gemma `.task` model from Settings → On-device intelligence.
+From a machine with the Android SDK configured:
 
-The optional LLM runtime is best validated on a physical device rather than an emulator.
+```bash
+./gradlew clean
+./gradlew testDebugUnitTest
+./gradlew lintDebug
+./gradlew assembleDebug
+```
 
-## Validation already performed in this session
+The repository also contains `.github/workflows/android.yml` on the production-hardening branch to run unit tests, lint, and a debug assembly. Until that workflow produces a successful run, CI remains **unverified**, not passed.
 
-- Pure Kotlin intelligence files compile with `kotlinc`.
-- Logic smoke checks pass for OTP, payment, promotion, amount extraction, and natural-language search parsing.
-- All XML resources parse successfully.
-- A parser pass over all Kotlin files found no Kotlin syntax errors.
+## Device verification still required
 
-A full Android Gradle compile could not be run in this environment because the Android SDK is not installed and the live Android Studio workspace tunnel was disconnected.
+NotificationListenerService behavior, notification cancellation, clipboard presentation, TTS routing, WorkManager/OEM scheduling, reboot/rebind behavior, MediaPipe inference, and lock-screen behavior require physical-device coverage. At minimum test Android 13, 14, 15, 16, and the newest supported release across AOSP/Pixel plus major OEMs where available.
 
-## Important Android behavior
+## Local AI runtime note
 
-NotiFlow can cancel selected low-priority notifications after the listener observes them, but Android/OEM behavior can vary and the source notification may briefly appear first. The UI communicates this limitation instead of claiming perfect blocking.
+Google's current MediaPipe LLM Inference Android guide documents `com.google.mediapipe:tasks-genai:0.10.27` but now describes that API as maintenance-only and recommends LiteRT-LM for new work. Model format/identity must be verified against the exact runtime before enabling acquisition. NotiFlow therefore does not treat “non-empty model file” as sufficient production evidence and does not auto-download a model.
 
-WorkManager is used for battery-conscious scheduled work. Daily digest delivery may occur slightly after the selected clock time under Android background scheduling rules.
+Official references:
+
+- https://developers.google.com/edge/mediapipe/solutions/genai/llm_inference/android
+- https://developers.google.com/edge/mediapipe/solutions/genai/llm_inference
+- https://developers.google.com/edge/litert-lm/android
+
+## Audit
+
+See `AUDIT_FINDINGS.md` on the production-hardening branch for the baseline, claim-vs-code table, feature truth table, prioritized defects, verification gates, and remaining device/Play work.

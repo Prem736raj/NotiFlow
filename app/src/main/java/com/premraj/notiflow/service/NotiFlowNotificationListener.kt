@@ -175,7 +175,12 @@ class NotiFlowNotificationListener : NotificationListenerService() {
             postedAt = sbn.postTime
         )
 
-        val id = graph.store.upsertIncoming(incoming, initial, vip)
+        val id = graph.store.upsertIncoming(
+            incoming = incoming,
+            classification = initial,
+            isVip = vip,
+            expenseTrackingEnabled = graph.preferences.expenseTrackerEnabled
+        )
 
         // Automatic OTP copy feature
         val otpCode = ActionExtractor.extractOtpCode(title, body)
@@ -210,6 +215,8 @@ class NotiFlowNotificationListener : NotificationListenerService() {
         }
 
         val stored = graph.store.get(id) ?: return
+
+        graph.voiceReader.speak(stored)
 
         val quietBySource = sbn.packageName in graph.preferences.quietPackages()
         val quietByCategory = stored.category in graph.preferences.quietCategories()
@@ -262,7 +269,7 @@ class NotiFlowNotificationListener : NotificationListenerService() {
 
             val alert = NotificationCompat.Builder(this, NotificationChannels.OTP_ALERTS)
                 .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle("✓ OTP Auto-Copied: $code")
+                .setContentTitle("✓ OTP copied")
                 .setContentText("Verification code from $appName is in your clipboard")
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(Notification.CATEGORY_STATUS)

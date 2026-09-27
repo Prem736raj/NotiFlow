@@ -54,9 +54,9 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -74,6 +74,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -100,10 +101,11 @@ fun SettingsScreen(
     val prefVersion by viewModel.preferencesVersion.collectAsStateWithLifecycle()
     val isHeadphonesConnected by viewModel.isHeadphonesConnected.collectAsStateWithLifecycle()
     val downloadStatus by viewModel.modelDownloadStatus.collectAsStateWithLifecycle()
-    val downloadProgress by viewModel.modelDownloadProgress.collectAsStateWithLifecycle()
     val prefs = viewModel.preferences
 
     var clearConfirm by remember { mutableStateOf(false) }
+    var backupDialog by remember { mutableStateOf(false) }
+    var backupPassphrase by remember { mutableStateOf("") }
     var postGranted by remember(prefVersion) {
         mutableStateOf(
             Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
@@ -119,9 +121,57 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = { clearConfirm = false },
             title = { Text("Delete all notification history?") },
-            text = { Text("This permanently removes NotiFlow's local notification records. Source apps are not affected.") },
+            text = { Text("This permanently removes NotiFlow's local notification records and derived expense rows. Source apps are not affected.") },
             confirmButton = { TextButton(onClick = { clearConfirm = false; viewModel.clearHistory() }) { Text("Delete all") } },
             dismissButton = { TextButton(onClick = { clearConfirm = false }) { Text("Cancel") } }
+        )
+    }
+
+    if (backupDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                backupDialog = false
+                backupPassphrase = ""
+            },
+            title = { Text("Protect encrypted backup") },
+            text = {
+                Column {
+                    Text("Create a passphrase with at least 12 characters. You will need the same passphrase to decrypt this backup.")
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = backupPassphrase,
+                        onValueChange = { backupPassphrase = it },
+                        label = { Text("Backup passphrase") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = backupPassphrase.length >= 12,
+                    onClick = {
+                        val backupText = viewModel.createEncryptedBackup(backupPassphrase)
+                        backupPassphrase = ""
+                        backupDialog = false
+                        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_SUBJECT, "NotiFlow Encrypted Backup")
+                            putExtra(Intent.EXTRA_TEXT, backupText)
+                        }
+                        context.startActivity(Intent.createChooser(sendIntent, "Export Encrypted Backup"))
+                    }
+                ) { Text("Create backup") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        backupDialog = false
+                        backupPassphrase = ""
+                    }
+                ) { Text("Cancel") }
+            }
         )
     }
 
@@ -200,7 +250,7 @@ fun SettingsScreen(
 
                 SettingsCard(Icons.Outlined.DoNotDisturbOn, "Context Focus Mode") {
                     Text(
-                        "Silence distractions while preserving urgent messages, OTPs, and VIP contacts.",
+                        "Track manual and scheduled focus profiles. Notification suppression remains disabled until its safety policy is fully verified.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -218,7 +268,7 @@ fun SettingsScreen(
                                 color = if (focusStatus.isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = if (focusStatus.isActive) "Suppressing non-essential notifications" else "Normal notification flow",
+                                text = if (focusStatus.isActive) "Focus profile active; suppression policy is not yet enforced" else "Normal notification flow",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -432,11 +482,10 @@ fun SettingsScreen(
             }
 
             item {
-                // On-device AI Engine with Automatic Background Download (Zero manual buttons)
                 SettingsCard(Icons.Outlined.AutoAwesome, "On-device AI Engine") {
                     SettingSwitch(
                         title = "Local AI refinement",
-                        subtitle = "Runs locally on your phone to refine ambiguous notifications without battery drain or cloud telemetry.",
+                        subtitle = "Optional refinement for ambiguous notifications. NotiFlow never auto-downloads a model; rules-only classification remains available.",
                         checked = prefs.localAiEnabled,
                         onChecked = viewModel::setLocalAiEnabled
                     )
@@ -452,70 +501,28 @@ fun SettingsScreen(
                             when (downloadStatus) {
                                 ModelDownloadStatus.READY -> {
                                     Text(
-                                        "⚡ AI Model Active",
+                                        "Local model file detected",
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                     Spacer(Modifier.height(4.dp))
                                     Text(
-                                        "On-device neural model is ready and actively refining notifications 100% offline.",
+                                        "If model initialization or inference fails, NotiFlow falls back to deterministic on-device rules.",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
-                                ModelDownloadStatus.DOWNLOADING -> {
+                                else -> {
                                     Text(
-                                        "📥 Auto-Downloading AI Model (${(downloadProgress * 100).toInt()}%)",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Spacer(Modifier.height(6.dp))
-                                    LinearProgressIndicator(
-                                        progress = { downloadProgress },
-                                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-                                        color = MaterialTheme.colorScheme.primary,
-                                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
-                                    )
-                                    Spacer(Modifier.height(6.dp))
-                                    Text(
-                                        "Downloading AI model in the background. The app is fully operational while downloading.",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                ModelDownloadStatus.FAILED -> {
-                                    Text(
-                                        "⚠️ Background Download Paused",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.error
-                                    )
-                                    Spacer(Modifier.height(4.dp))
-                                    Text(
-                                        "Built-in instant rules are actively classifying 98% of alerts in <1ms without any model required.",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Spacer(Modifier.height(8.dp))
-                                    OutlinedButton(
-                                        onClick = { viewModel.retryModelDownload() },
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text("Retry auto-download now")
-                                    }
-                                }
-                                ModelDownloadStatus.IDLE -> {
-                                    Text(
-                                        "⏳ Auto-Setup Pending",
+                                        "Rules-only mode",
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                     Spacer(Modifier.height(4.dp))
                                     Text(
-                                        "AI model will download automatically in background when internet is connected.",
+                                        "No local model is configured. Automatic network model acquisition is disabled until model identity, integrity, consent, and compatibility are production-verified.",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -525,7 +532,7 @@ fun SettingsScreen(
                     }
 
                     Text(
-                        "Notification text is never sent to any external server or cloud API. All processing remains strictly local on your phone.",
+                        "Notification text is processed locally. There is no cloud inference fallback in NotiFlow's classifier.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp)
@@ -542,14 +549,14 @@ fun SettingsScreen(
                         onChecked = viewModel::setAutoCopyOtp
                     )
                     SettingSwitch(
-                        title = "Anti-Revoke (Recover deleted messages)",
-                        subtitle = "Preserve WhatsApp & Telegram messages before senders click 'Delete for everyone'.",
+                        title = "Preserve captured message history",
+                        subtitle = "Keeps captured WhatsApp & Telegram notification history after source notifications disappear. NotiFlow does not claim to detect why a sender notification was removed.",
                         checked = prefs.antiRevokeEnabled,
                         onChecked = viewModel::setAntiRevokeEnabled
                     )
                     SettingSwitch(
                         title = "Smart Bank & UPI Expense Tracker",
-                        subtitle = "Extract expenses and track monthly spending automatically on-device.",
+                        subtitle = "When enabled, derive supported transaction records from new notifications on-device. Turning this off stops new parsing; existing derived rows remain until you delete history.",
                         checked = prefs.expenseTrackerEnabled,
                         onChecked = viewModel::setExpenseTrackerEnabled
                     )
@@ -646,19 +653,11 @@ fun SettingsScreen(
                     Spacer(Modifier.height(14.dp))
 
                     Button(
-                        onClick = {
-                            val backupText = viewModel.createEncryptedBackup()
-                            val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                                type = "text/plain"
-                                putExtra(Intent.EXTRA_SUBJECT, "NotiFlow Encrypted Backup")
-                                putExtra(Intent.EXTRA_TEXT, backupText)
-                            }
-                            context.startActivity(Intent.createChooser(sendIntent, "Export Encrypted Backup"))
-                        },
+                        onClick = { backupDialog = true },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("Export AES-256 Encrypted Backup", fontWeight = FontWeight.Bold)
+                        Text("Export password-protected backup", fontWeight = FontWeight.Bold)
                     }
 
                     Spacer(Modifier.height(10.dp))

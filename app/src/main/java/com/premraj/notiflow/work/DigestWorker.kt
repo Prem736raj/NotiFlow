@@ -49,10 +49,14 @@ class DigestWorker(
             append(structured.replaceFirstChar { it.uppercase() })
             if (important.isNotEmpty()) append(". ${important.size} important item${if (important.size == 1) "" else "s"} also arrived.")
         }
-        val summary = graph.gemma.summarize(
-            lowValue.take(24).map { "${it.appName}: ${it.displayTitle} — ${it.displayBody}" },
+        val summary = if (graph.preferences.hideSensitivePreviews) {
             fallback
-        )
+        } else {
+            graph.gemma.summarize(
+                lowValue.take(24).map { "${it.appName}: ${it.displayTitle} — ${it.displayBody}" },
+                fallback
+            )
+        }
 
         val openIntent = Intent(applicationContext, MainActivity::class.java).apply {
             putExtra(MainActivity.EXTRA_OPEN_DIGEST, true)
@@ -65,6 +69,12 @@ class DigestWorker(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val publicVersion = NotificationCompat.Builder(applicationContext, NotificationChannels.DIGESTS)
+            .setSmallIcon(R.drawable.ic_notiflow)
+            .setContentTitle("NotiFlow digest")
+            .setContentText("${lowValue.size} notifications are ready to review")
+            .build()
+
         val notification = NotificationCompat.Builder(applicationContext, NotificationChannels.DIGESTS)
             .setSmallIcon(R.drawable.ic_notiflow)
             .setContentTitle("Your NotiFlow digest")
@@ -73,6 +83,8 @@ class DigestWorker(
             .setNumber(lowValue.size)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPublicVersion(publicVersion)
             .build()
 
         if (ActivityCompat.checkSelfPermission(applicationContext, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {

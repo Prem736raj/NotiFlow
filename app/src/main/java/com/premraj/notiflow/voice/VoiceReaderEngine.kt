@@ -28,6 +28,7 @@ class VoiceReaderEngine(
     val isHeadphonesConnected: StateFlow<Boolean> = _isHeadphonesConnected.asStateFlow()
 
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+    private var audioDeviceCallback: android.media.AudioDeviceCallback? = null
 
     init {
         tts = TextToSpeech(context.applicationContext, this)
@@ -46,13 +47,14 @@ class VoiceReaderEngine(
         val am = audioManager ?: return false
         val devices = am.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
         return devices.any { device ->
-            device.type in listOf(
+            when (device.type) {
                 AudioDeviceInfo.TYPE_WIRED_HEADSET,
                 AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
                 AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
-                AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
-                AudioDeviceInfo.TYPE_USB_HEADSET
-            )
+                AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> true
+                else -> android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O &&
+                    device.type == AudioDeviceInfo.TYPE_USB_HEADSET
+            }
         }
     }
 
@@ -62,7 +64,7 @@ class VoiceReaderEngine(
 
     private fun registerAudioDeviceCallback() {
         try {
-            audioManager?.registerAudioDeviceCallback(object : android.media.AudioDeviceCallback() {
+            val callback = object : android.media.AudioDeviceCallback() {
                 override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) {
                     checkAudioDevices()
                 }
@@ -70,7 +72,9 @@ class VoiceReaderEngine(
                 override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>?) {
                     checkAudioDevices()
                 }
-            }, null)
+            }
+            audioDeviceCallback = callback
+            audioManager?.registerAudioDeviceCallback(callback, null)
         } catch (_: Exception) {}
     }
 
@@ -102,27 +106,8 @@ class VoiceReaderEngine(
         return allowedByFilter
     }
 
-    fun buildAnnouncement(item: NotificationItem): String {
-        val appName = item.appName.ifBlank { "New notification" }
-        val sender = item.sender?.takeIf { it.isNotBlank() }
-        val detail = preferences.voiceReadingDetail
-
-        return when (detail) {
-            VoiceReadingDetail.SENDER_ONLY -> {
-                if (sender != null) "$appName from $sender" else appName
-            }
-            VoiceReadingDetail.FULL_MESSAGE -> {
-                val cleanText = item.body?.replace("\n", " ")?.take(120).orEmpty()
-                if (sender != null) {
-                    "$appName from $sender: $cleanText"
-                } else if (cleanText.isNotBlank()) {
-                    "$appName: $cleanText"
-                } else {
-                    appName
-                }
-            }
-        }
-    }
+    fun buildAnnouncement(item: NotificationItem): String =
+        VoiceReaderPolicy.buildAnnouncement(item, preferences.voiceReadingDetail)
 
     fun speak(item: NotificationItem) {
         if (!shouldAnnounce(item)) return
@@ -144,8 +129,37 @@ class VoiceReaderEngine(
     }
 
     fun shutdown() {
+        audioDeviceCallback?.let { callback ->
+            try {
+                audioManager?.unregisterAudioDeviceCallback(callback)
+            } catch (_: Exception) {}
+            audioDeviceCallback = null
+        }
         tts?.stop()
         tts?.shutdown()
         tts = null
+    }
+}
+
+object VoiceReaderPolicy {
+    fun buildAnnouncement(item: NotificationItem, detail: VoiceReadingDetail): String {
+        val appName = item.appName.ifBlank { "New notification" }
+        val sender = item.sender?.takeIf { it.isNotBlank() }
+
+        return when (detail) {
+            VoiceReadingDetail.SENDER_ONLY -> {
+                if (sender != null) "$appName from $sender" else appName
+            }
+            VoiceReadingDetail.FULL_MESSAGE -> {
+                val cleanText = item.body?.replace("\n", " ")?.take(120).orEmpty()
+                if (sender != null) {
+                    "$appName from $sender: $cleanText"
+                } else if (cleanText.isNotBlank()) {
+                    "$appName: $cleanText"
+                } else {
+                    appName
+                }
+            }
+        }
     }
 }

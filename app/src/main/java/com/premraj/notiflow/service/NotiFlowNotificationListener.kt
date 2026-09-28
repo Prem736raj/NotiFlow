@@ -264,7 +264,7 @@ class NotiFlowNotificationListener : NotificationListenerService() {
         if (NotificationPosting.canPost(this, NotificationChannels.OTP_ALERTS)) {
             val tapIntent = PendingIntent.getActivity(
                 this,
-                notificationId.toInt(),
+                NotificationPosting.safeNotificationId(notificationId, 80_000),
                 Intent(this, MainActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
                     putExtra("notification_id", notificationId)
@@ -285,7 +285,7 @@ class NotiFlowNotificationListener : NotificationListenerService() {
                 .build()
 
             val manager = getSystemService(NotificationManager::class.java)
-            manager.notify((notificationId + 90000L).toInt(), alert)
+            manager.notify(NotificationPosting.safeNotificationId(notificationId, 90_000), alert)
         }
     }
 

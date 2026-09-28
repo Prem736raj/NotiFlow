@@ -27,5 +27,10 @@ object NotificationPosting {
 
         return true
     }
+
+    fun safeNotificationId(id: Long, offset: Int = 0): Int {
+        val folded = ((id xor (id ushr 32)).toInt() and 0x3FFFFFFF)
+        return (folded + offset) and 0x7FFFFFFF
+    }
 }
 

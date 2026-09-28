@@ -16,6 +16,7 @@ import com.premraj.notiflow.appGraph
 import com.premraj.notiflow.data.NotificationCategory
 import com.premraj.notiflow.data.NotificationState
 import com.premraj.notiflow.util.NotificationChannels
+import com.premraj.notiflow.util.NotificationPosting
 
 class ReminderWorker(
     appContext: Context,
@@ -33,7 +34,7 @@ class ReminderWorker(
         }
         val pendingIntent = PendingIntent.getActivity(
             applicationContext,
-            id.toInt(),
+            NotificationPosting.safeNotificationId(id, 20_000),
             openIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -67,7 +68,8 @@ class ReminderWorker(
             .build()
 
         if (ActivityCompat.checkSelfPermission(applicationContext, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
-            NotificationManagerCompat.from(applicationContext).notify((10_000 + id).toInt(), notification)
+            val notificationId = NotificationPosting.safeNotificationId(id, 10_000)
+            NotificationManagerCompat.from(applicationContext).notify(notificationId, notification)
         }
         return Result.success()
     }

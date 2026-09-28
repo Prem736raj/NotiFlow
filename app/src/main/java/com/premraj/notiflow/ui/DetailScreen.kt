@@ -78,6 +78,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -109,6 +110,7 @@ fun DetailScreen(
     onOpenOriginal: () -> Boolean
 ) {
     val context = LocalContext.current
+    val platformLocale = LocalLocale.current.platformLocale
     val dark = isSystemInDarkTheme()
     var categoryMenu by remember { mutableStateOf(false) }
     var priorityMenu by remember { mutableStateOf(false) }
@@ -343,7 +345,7 @@ fun DetailScreen(
                                 }
 
                                 Text(
-                                    text = (if (isDebit) "- " else "+ ") + String.format(java.util.Locale.getDefault(), "₹%,.2f", exp.amount),
+                                    text = (if (isDebit) "- " else "+ ") + String.format(platformLocale, "₹%,.2f", exp.amount),
                                     style = MaterialTheme.typography.titleLarge.copy(
                                         fontWeight = FontWeight.ExtraBold,
                                         fontFamily = FontFamily.SansSerif
@@ -377,7 +379,7 @@ fun DetailScreen(
                                     exp.balanceAfter?.let { bal ->
                                         Column(horizontalAlignment = Alignment.End) {
                                             Text("Balance After", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                            Text(String.format(java.util.Locale.getDefault(), "₹%,.2f", bal), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                            Text(String.format(platformLocale, "₹%,.2f", bal), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                                         }
                                     }
                                 }

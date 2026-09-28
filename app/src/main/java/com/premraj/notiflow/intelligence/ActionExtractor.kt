@@ -19,10 +19,17 @@ sealed interface SmartAction {
 
 object ActionExtractor {
     private val urlRegex = Regex("https?://[^\\s]+", RegexOption.IGNORE_CASE)
-    private val phoneRegex = Regex("(?<!\\d)(?:\\+?91[- ]?)?[6-9]\\d{9}(?!\\d)")
+    private val phoneRegex = Regex("(?<!\\d)(\\+?91[- ]?)?([6-9]\\d{9})(?!\\d)")
+    private val phoneContext = Regex("(?i)\\b(?:call|phone|mobile|contact|telephone|tel|reach|whatsapp)\\b")
+    private val trackingContext = Regex("(?i)\\b(?:order|tracking|shipment|awb|consignment|reference|invoice)\\b")
     private val codeRegex = Regex("(?<!\\d)(\\d{4,8})(?!\\d)")
-    private val addressHints = Regex("(?i)\\b(?:road|rd\\.?|street|st\\.?|sector|avenue|lane|phase|block|nagar|colony|market|mall|airport|station)\\b")
+    private val strongAddressHints = Regex("(?i)\\b(?:road|rd\\.?|street|st\\.?|sector|avenue|lane|nagar|colony|mall|airport|highway)\\b")
+    private val weakAddressHints = Regex("(?i)\\b(?:phase|block|market|station)\\b")
+    private val addressNumberHint = Regex("(?i)\\b(?:plot|house|flat|shop|sector|block|phase)\\s*[-#:]*\\s*[A-Za-z0-9-]+\\b|\\b\\d{1,4}\\s+[A-Za-z][A-Za-z .'-]{1,30}\\s+(?:road|rd\\.?|street|st\\.?|avenue|lane)\\b")
+    private val postalCodeHint = Regex("(?<!\\d)\\d{6}(?!\\d)")
     private val dateFormats = listOf("dd/MM/yyyy", "dd-MM-yyyy", "yyyy-MM-dd", "dd MMM yyyy", "MMM dd, yyyy")
+    private val time12Regex = Regex("(?i)\\b(?:at\\s*)?(1[0-2]|0?[1-9])(?::([0-5]\\d))?\\s*(am|pm)\\b")
+    private val time24Regex = Regex("(?i)\\b(?:at\\s*)?([01]?\\d|2[0-3]):([0-5]\\d)\\b")
 
     // Keywords that appear BEFORE the OTP digits (gap up to 40 chars including newlines)
     private val otpAfterKeyword = Regex(
@@ -114,7 +121,7 @@ object ActionExtractor {
         val actions = mutableListOf<SmartAction>()
 
         urlRegex.find(text)?.value?.trimEnd('.', ',', ')')?.let { actions += SmartAction.OpenUrl(it) }
-        phoneRegex.find(text)?.value?.let { actions += SmartAction.Call(it.replace(" ", "").replace("-", "")) }
+        extractPhone(text)?.let { actions += SmartAction.Call(it) }
 
         val code = extractOtpCode(text)
         if (code != null) {
@@ -123,7 +130,7 @@ object ActionExtractor {
 
         parseDate(text)?.let { actions += SmartAction.AddCalendar(item.displayTitle, it) }
 
-        if (addressHints.containsMatchIn(text) && text.length in 12..220) {
+        if (looksLikeAddress(text)) {
             actions += SmartAction.OpenMap(text)
         }
 
@@ -139,10 +146,61 @@ object ActionExtractor {
                 val parsed = runCatching {
                     SimpleDateFormat(format, Locale.ENGLISH).apply { isLenient = false }.parse(candidate)
                 }.getOrNull()
-                if (parsed != null) return parsed.time
+                if (parsed != null) return applyTime(parsed.time, text)
             }
         }
         return null
+    }
+
+    private fun extractPhone(text: String): String? {
+        return phoneRegex.findAll(text).firstNotNullOfOrNull { match ->
+            val prefix = match.groupValues[1]
+            val windowStart = (match.range.first - 36).coerceAtLeast(0)
+            val windowEnd = (match.range.last + 37).coerceAtMost(text.length)
+            val context = text.substring(windowStart, windowEnd)
+            val hasPhoneContext = phoneContext.containsMatchIn(context)
+            val looksLikeTracking = trackingContext.containsMatchIn(context) && !hasPhoneContext
+            if (looksLikeTracking || (prefix.isBlank() && !hasPhoneContext)) {
+                null
+            } else {
+                match.value.replace(" ", "").replace("-", "")
+            }
+        }
+    }
+
+    private fun looksLikeAddress(text: String): Boolean {
+        if (text.length !in 12..220) return false
+        val strongCount = strongAddressHints.findAll(text).count()
+        val weakCount = weakAddressHints.findAll(text).count()
+        val hasNumber = addressNumberHint.containsMatchIn(text)
+        val hasPostalCode = postalCodeHint.containsMatchIn(text)
+        return strongCount >= 2 ||
+            (strongCount >= 1 && (weakCount >= 1 || hasNumber || hasPostalCode)) ||
+            (weakCount >= 2 && (hasNumber || hasPostalCode))
+    }
+
+    private fun applyTime(dateMillis: Long, text: String): Long {
+        val calendar = Calendar.getInstance().apply { timeInMillis = dateMillis }
+        time12Regex.find(text)?.let { match ->
+            var hour = match.groupValues[1].toInt()
+            val minute = match.groupValues[2].toIntOrNull() ?: 0
+            val meridiem = match.groupValues[3].lowercase(Locale.ENGLISH)
+            if (hour == 12) hour = 0
+            if (meridiem == "pm") hour += 12
+            calendar.set(Calendar.HOUR_OF_DAY, hour)
+            calendar.set(Calendar.MINUTE, minute)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
+            return calendar.timeInMillis
+        }
+
+        time24Regex.find(text)?.let { match ->
+            calendar.set(Calendar.HOUR_OF_DAY, match.groupValues[1].toInt())
+            calendar.set(Calendar.MINUTE, match.groupValues[2].toInt())
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
+        }
+        return calendar.timeInMillis
     }
 }
 

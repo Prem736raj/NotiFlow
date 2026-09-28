@@ -215,35 +215,24 @@ class NotiFlowNotificationListener : NotificationListenerService() {
 
         val quietBySource = sbn.packageName in graph.preferences.quietPackages()
         val quietByCategory = stored.category in graph.preferences.quietCategories()
-        val focusActive = graph.focusEngine.currentStatus().isActive
-
-        // Destructive quieting only after final stored classification.
-        // Never quiet VIP/high/normal items. Require confidence >= 0.90 and safe low-value category.
-        val safeLowValueCategory = stored.category in setOf(
-            NotificationCategory.PROMOTION,
-            NotificationCategory.SPAM,
-            NotificationCategory.SOCIAL
-        )
+        val focusStatus = graph.focusEngine.currentStatus()
 
         val sensitiveByDeterministicRules =
             otpCode != null ||
             fast.category in setOf(NotificationCategory.OTP, NotificationCategory.PAYMENT) ||
             initial.category in setOf(NotificationCategory.OTP, NotificationCategory.PAYMENT)
 
-        val shouldQuiet =
-            (quietBySource || quietByCategory || focusActive) &&
-            !stored.isVip &&
-            !stored.pinned &&
+        val safeToSuppress =
             !sensitiveByDeterministicRules &&
-            LocalIntelligence.effectivePriority(stored) == NotificationPriority.LOW &&
-            stored.confidence >= 0.90f &&
-            safeLowValueCategory
+            LocalIntelligence.isSafeLowValueForSuppression(stored)
+        val quietWouldSuppress = (quietBySource || quietByCategory) && safeToSuppress
+        val focusWouldSuppress = focusStatus.isActive && safeToSuppress
 
-        if (shouldQuiet) {
+        if (quietWouldSuppress || focusWouldSuppress) {
             runCatching { cancelNotification(sbn.key) }
                 .onSuccess {
-                    if (focusActive) {
-                        graph.preferences.focusBlockedCount = graph.preferences.focusBlockedCount + 1
+                    if (focusWouldSuppress && !quietWouldSuppress) {
+                        graph.focusEngine.recordSuppressed()
                     }
                 }
         }

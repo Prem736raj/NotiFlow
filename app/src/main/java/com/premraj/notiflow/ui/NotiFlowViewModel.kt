@@ -337,6 +337,11 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
         bumpPrefs()
     }
 
+    fun stopActiveFocus() {
+        graph.focusEngine.stopActiveFocus()
+        bumpPrefs()
+    }
+
     fun setSleepFocusScheduled(scheduled: Boolean) {
         graph.preferences.sleepFocusScheduled = scheduled
         bumpPrefs()

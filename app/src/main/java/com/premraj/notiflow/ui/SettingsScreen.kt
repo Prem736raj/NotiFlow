@@ -299,7 +299,13 @@ fun SettingsScreen(
                         }
 
                         Button(
-                            onClick = { viewModel.toggleManualFocus(FocusProfileType.WORK) },
+                            onClick = {
+                                if (focusStatus.isActive) {
+                                    viewModel.stopActiveFocus()
+                                } else {
+                                    viewModel.toggleManualFocus(FocusProfileType.WORK)
+                                }
+                            },
                             colors = if (focusStatus.isActive) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                             else ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                         ) {
@@ -311,14 +317,14 @@ fun SettingsScreen(
 
                     SettingSwitch(
                         title = "Sleep schedule profile (11 PM - 7 AM)",
-                        subtitle = "Applies the conservative low-value suppression policy during this schedule.",
+                        subtitle = "Opt in to conservative low-value suppression during this schedule.",
                         checked = prefs.sleepFocusScheduled,
                         onChecked = viewModel::setSleepFocusScheduled
                     )
 
                     SettingSwitch(
                         title = "Work hours profile (Mon-Fri, 9 AM - 5 PM)",
-                        subtitle = "Applies the conservative low-value suppression policy during office hours.",
+                        subtitle = "Opt in to conservative low-value suppression during office hours.",
                         checked = prefs.workFocusScheduled,
                         onChecked = viewModel::setWorkFocusScheduled
                     )

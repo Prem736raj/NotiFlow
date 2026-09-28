@@ -75,7 +75,9 @@ class NotificationStore(context: Context) {
                     put("is_vip", if (isVip) 1 else 0)
                     put("read", if (existing?.read == true) 1 else 0)
                     classification.amountHint?.let { put("amount_hint", it) } ?: existing?.amountHint?.let { put("amount_hint", it) }
-                    put("is_removed_by_source", if (existing?.isRemovedBySource == true) 1 else 0)
+                    // A fresh post for the same notification key is active again, so any
+                    // prior source-removal marker belongs to the previous lifecycle.
+                    put("is_removed_by_source", 0)
                 }
 
                 val rowId = if (existing == null) {

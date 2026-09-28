@@ -7,7 +7,10 @@ import com.premraj.notiflow.data.NotificationPriority
 
 object LocalIntelligence {
     private val otpRegex = Regex("(?i)\\b(?:otp|one[ -]?time password|verification code|security code|login code|auth code)\\b")
-    private val amountRegex = Regex("(?i)(?:₹|rs\\.?|inr|usd|\\$)\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)")
+    private val amountRegexes = listOf(
+        Regex("(?i)(?:₹|rs\\.?|inr|rupees?|usd|\\$)\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)"),
+        Regex("(?i)\\b([0-9][0-9,]*(?:\\.[0-9]{1,2})?)\\s*(?:inr|rs\\.?|rupees?|usd)\\b")
+    )
     private val paymentRegex = Regex("(?i)\\b(?:debited|credited|transaction|payment|upi|bank|account|card|paid|refund|balance|emi|autopay|mandate)\\b")
     private val paymentAlertRegex = Regex("(?i)\\b(?:declined|failed|fraud|suspicious|blocked|unauthori[sz]ed|overdue|due today)\\b")
     private val explicitTransactionRegex = Regex("(?i)\\b(?:debited|credited|upi (?:payment|transaction)|card (?:payment|transaction)|refund (?:received|processed))\\b")
@@ -21,7 +24,9 @@ object LocalIntelligence {
 
     fun classify(packageName: String, title: String?, body: String?, sender: String?): ClassificationResult {
         val text = semanticText(title, body, sender)
-        val amount = amountRegex.find(text)?.groupValues?.getOrNull(1)?.replace(",", "")?.toDoubleOrNull()
+        val amount = amountRegexes.firstNotNullOfOrNull { regex ->
+            regex.find(text)?.groupValues?.getOrNull(1)?.replace(",", "")?.toDoubleOrNull()
+        }
 
         val category = when {
             otpRegex.containsMatchIn(text) -> NotificationCategory.OTP
@@ -98,6 +103,22 @@ object LocalIntelligence {
             return NotificationPriority.NORMAL
         }
         return item.priority
+    }
+
+    fun isSafeLowValueForSuppression(
+        item: NotificationItem,
+        now: Long = System.currentTimeMillis()
+    ): Boolean {
+        if (item.isVip || item.pinned) return false
+        if (effectivePriority(item, now) != NotificationPriority.LOW) return false
+
+        val minimumConfidence = when (item.category) {
+            NotificationCategory.PROMOTION,
+            NotificationCategory.SPAM -> 0.85f
+            NotificationCategory.SOCIAL -> 0.70f
+            else -> return false
+        }
+        return item.confidence >= minimumConfidence
     }
 
     private fun semanticText(title: String?, body: String?, sender: String?): String =

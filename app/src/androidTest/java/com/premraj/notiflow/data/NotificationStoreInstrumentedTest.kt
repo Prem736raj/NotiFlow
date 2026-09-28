@@ -53,4 +53,54 @@ class NotificationStoreInstrumentedTest {
         assertEquals(1, store.items.value.count { it.notificationKey == "same-notification-key" })
         assertEquals(ids.first(), store.get(ids.first())?.id)
     }
+
+    @Test
+    fun repostClearsPreviousSourceRemovalFlag() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val store = NotificationStore(context)
+        store.initialLoadComplete.first { it }
+        store.clearAll()
+
+        val classification = ClassificationResult(
+            category = NotificationCategory.MESSAGE,
+            priority = NotificationPriority.NORMAL,
+            confidence = 0.8f
+        )
+        val firstId = store.upsertIncoming(
+            incoming = IncomingNotification(
+                key = "reposted-key",
+                packageName = "com.example.chat",
+                appName = "Example Chat",
+                title = "First",
+                body = "First message",
+                sender = "Sender",
+                postedAt = 1_000_000L
+            ),
+            classification = classification,
+            isVip = false,
+            expenseTrackingEnabled = false
+        )
+
+        store.markRemoved("reposted-key", removedBySource = true)
+        assertEquals(true, store.get(firstId)?.isRemovedBySource)
+
+        val secondId = store.upsertIncoming(
+            incoming = IncomingNotification(
+                key = "reposted-key",
+                packageName = "com.example.chat",
+                appName = "Example Chat",
+                title = "Second",
+                body = "Reposted message",
+                sender = "Sender",
+                postedAt = 2_000_000L
+            ),
+            classification = classification,
+            isVip = false,
+            expenseTrackingEnabled = false
+        )
+
+        assertEquals(firstId, secondId)
+        assertEquals(false, store.get(secondId)?.isRemovedBySource)
+        assertEquals(true, store.get(secondId)?.isActiveOnSystem)
+    }
 }

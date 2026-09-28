@@ -24,6 +24,23 @@ class LocalIntelligenceTest {
     }
 
     @Test
+    fun extractsSuffixCurrencyAmounts() {
+        listOf(
+            "Payment of 500 INR completed",
+            "Payment of 500 rs completed",
+            "Payment of 500 rupees completed"
+        ).forEach { body ->
+            val result = LocalIntelligence.classify(
+                packageName = "com.example.bank",
+                title = "Bank alert",
+                body = body,
+                sender = null
+            )
+            assertEquals(500.0, result.amountHint ?: 0.0, 0.001)
+        }
+    }
+
+    @Test
     fun otpIsTimeSensitive() {
         val result = LocalIntelligence.classify(
             packageName = "com.example.app",
@@ -45,6 +62,7 @@ class LocalIntelligenceTest {
         )
         assertEquals(NotificationCategory.PROMOTION, result.category)
         assertEquals(NotificationPriority.LOW, result.priority)
+        assertTrue(LocalIntelligence.isSafeLowValueForSuppression(itemFrom(result)))
     }
 
     @Test
@@ -129,6 +147,12 @@ class LocalIntelligenceTest {
         )
         assertEquals(NotificationCategory.SOCIAL, result.category)
         assertEquals(NotificationPriority.LOW, result.priority)
+        assertTrue(LocalIntelligence.isSafeLowValueForSuppression(itemFrom(result)))
+        assertFalse(
+            LocalIntelligence.isSafeLowValueForSuppression(
+                itemFrom(result.copy(confidence = 0.69f))
+            )
+        )
     }
 
     @Test
@@ -208,5 +232,32 @@ class LocalIntelligenceTest {
 
         assertEquals(NotificationPriority.HIGH, LocalIntelligence.effectivePriority(item))
         assertEquals(NotificationPriority.NORMAL, item.priority)
+    }
+
+    private fun itemFrom(result: com.premraj.notiflow.data.ClassificationResult): NotificationItem {
+        return NotificationItem(
+            id = 99L,
+            notificationKey = "test-key",
+            packageName = "com.example",
+            appName = "Example",
+            title = "Test",
+            body = "Test body",
+            sender = null,
+            postedAt = 1_000_000L,
+            updatedAt = 1_000_000L,
+            removedAt = null,
+            isActiveOnSystem = true,
+            category = result.category,
+            priority = result.priority,
+            confidence = result.confidence,
+            categoryOverridden = false,
+            priorityOverridden = false,
+            state = NotificationState.ACTIVE,
+            remindAt = null,
+            pinned = false,
+            isVip = false,
+            read = false,
+            amountHint = result.amountHint
+        )
     }
 }

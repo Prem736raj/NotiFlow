@@ -135,11 +135,11 @@ class UserPreferences internal constructor(private val prefs: SharedPreferences)
         set(value) = prefs.edit().putString(KEY_MANUAL_FOCUS_TYPE, value.name).apply()
 
     var sleepFocusScheduled: Boolean
-        get() = prefs.getBoolean(KEY_SLEEP_FOCUS_SCHEDULED, true)
+        get() = prefs.getBoolean(KEY_SLEEP_FOCUS_SCHEDULED, false)
         set(value) = prefs.edit().putBoolean(KEY_SLEEP_FOCUS_SCHEDULED, value).apply()
 
     var workFocusScheduled: Boolean
-        get() = prefs.getBoolean(KEY_WORK_FOCUS_SCHEDULED, true)
+        get() = prefs.getBoolean(KEY_WORK_FOCUS_SCHEDULED, false)
         set(value) = prefs.edit().putBoolean(KEY_WORK_FOCUS_SCHEDULED, value).apply()
 
     var focusBlockedCount: Int
@@ -149,6 +149,10 @@ class UserPreferences internal constructor(private val prefs: SharedPreferences)
     var focusActivatedAt: Long
         get() = prefs.getLong(KEY_FOCUS_ACTIVATED_AT, 0L)
         set(value) = prefs.edit().putLong(KEY_FOCUS_ACTIVATED_AT, value).apply()
+
+    var focusSessionToken: String?
+        get() = prefs.getString(KEY_FOCUS_SESSION_TOKEN, null)?.takeIf { it.isNotBlank() }
+        set(value) = prefs.edit().putString(KEY_FOCUS_SESSION_TOKEN, value).apply()
 
     var appThemeMode: AppThemeMode
         get() {
@@ -321,6 +325,7 @@ class UserPreferences internal constructor(private val prefs: SharedPreferences)
         const val KEY_WORK_FOCUS_SCHEDULED = "work_focus_scheduled"
         const val KEY_FOCUS_BLOCKED_COUNT = "focus_blocked_count"
         const val KEY_FOCUS_ACTIVATED_AT = "focus_activated_at"
+        const val KEY_FOCUS_SESSION_TOKEN = "focus_session_token"
         const val KEY_APP_THEME_MODE = "app_theme_mode"
         const val KEY_MODEL_AUTO_DOWNLOAD_STARTED = "model_auto_download_started"
     }

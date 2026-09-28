@@ -1,8 +1,15 @@
 package com.premraj.notiflow.intelligence
 
+import com.premraj.notiflow.data.NotificationCategory
+import com.premraj.notiflow.data.NotificationItem
+import com.premraj.notiflow.data.NotificationPriority
+import com.premraj.notiflow.data.NotificationState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.Calendar
 
 class ActionExtractorTest {
 
@@ -96,5 +103,64 @@ class ActionExtractorTest {
         val code = ActionExtractor.extractOtpCode(text)
         assertEquals("887766", code)
     }
+
+    @Test
+    fun trackingNumberIsNotOfferedAsPhoneCall() {
+        val actions = ActionExtractor.extract(item("Order tracking number 9876543210 is in transit"))
+        assertFalse(actions.any { it is SmartAction.Call })
+    }
+
+    @Test
+    fun contextualPhoneNumberIsOfferedAsPhoneCall() {
+        val actions = ActionExtractor.extract(item("Call courier at 9876543210 for delivery help"))
+        val call = actions.filterIsInstance<SmartAction.Call>().single()
+        assertEquals("9876543210", call.phone)
+    }
+
+    @Test
+    fun genericMarketOrStationWordsDoNotTriggerMaps() {
+        val actions = ActionExtractor.extract(item("Package reached the local market station and is processing"))
+        assertFalse(actions.any { it is SmartAction.OpenMap })
+    }
+
+    @Test
+    fun structuredAddressTriggersMaps() {
+        val actions = ActionExtractor.extract(item("Deliver to Sector 17, Chandigarh tomorrow"))
+        assertTrue(actions.any { it is SmartAction.OpenMap })
+    }
+
+    @Test
+    fun calendarActionKeepsExplicitTime() {
+        val actions = ActionExtractor.extract(item("Meeting on 30 Sep 2026 at 3:45 PM"))
+        val calendarAction = actions.filterIsInstance<SmartAction.AddCalendar>().single()
+        val calendar = Calendar.getInstance().apply { timeInMillis = calendarAction.startAt }
+        assertEquals(15, calendar.get(Calendar.HOUR_OF_DAY))
+        assertEquals(45, calendar.get(Calendar.MINUTE))
+    }
+
+    private fun item(body: String): NotificationItem = NotificationItem(
+        id = 1L,
+        notificationKey = "action-test",
+        packageName = "com.example",
+        appName = "Example",
+        title = "Update",
+        body = body,
+        sender = null,
+        postedAt = 1_000_000L,
+        updatedAt = 1_000_000L,
+        removedAt = null,
+        isActiveOnSystem = true,
+        category = NotificationCategory.OTHER,
+        priority = NotificationPriority.NORMAL,
+        confidence = 0.8f,
+        categoryOverridden = false,
+        priorityOverridden = false,
+        state = NotificationState.ACTIVE,
+        remindAt = null,
+        pinned = false,
+        isVip = false,
+        read = false,
+        amountHint = null
+    )
 }
 

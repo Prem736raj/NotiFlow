@@ -132,11 +132,11 @@ fun NotiFlowApp(
                         screen = AppScreen.HOME.name
                     },
                     onOpenOriginal = {
-                        val launchIntent = context.packageManager.getLaunchIntentForPackage(item.packageName)
-                        if (launchIntent != null) {
-                            context.startActivity(launchIntent)
-                            true
-                        } else false
+                        NotiFlowNotificationListener.openOriginal(
+                            context = context,
+                            notificationKey = item.notificationKey,
+                            sourcePackage = item.packageName
+                        )
                     }
                 )
             }

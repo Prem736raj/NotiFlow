@@ -83,7 +83,7 @@ fun HomeScreen(
     listenerEnabled: Boolean,
     hideSensitive: Boolean,
     expenses: List<ExpenseTransaction> = emptyList(),
-    onGetExpenseSummary: (ExpenseTimeRange) -> ExpenseSummary = { ExpenseSummary(0.0, 0.0, 0.0, 0, 0, emptyMap(), emptyList()) },
+    onGetExpenseSummary: suspend (ExpenseTimeRange) -> ExpenseSummary = { ExpenseSummary(0.0, 0.0, 0.0, 0, 0, emptyMap(), emptyList()) },
     onGetInsights: (InsightsTimeRange) -> NotificationInsights = {
         com.premraj.notiflow.intelligence.InsightsAnalyzer.computeInsights(notifications, it)
     },
@@ -113,7 +113,7 @@ fun HomeScreen(
             (!it.isActiveOnSystem && it.state == NotificationState.ACTIVE && !it.pinned &&
                 LocalIntelligence.effectivePriority(it) != NotificationPriority.LOW)
     }.sortedByDescending { it.updatedAt }
-    val deletedItems = notifications.filter { it.isDeletedBySender }.sortedByDescending { it.updatedAt }
+    val deletedItems = notifications.filter { it.isRemovedBySource }.sortedByDescending { it.updatedAt }
 
     val visible = when (selectedSection) {
         HomeSection.NOW -> nowItems
@@ -167,9 +167,9 @@ fun HomeScreen(
                                 HomeSection.LATER -> "Things you chose to revisit"
                                 HomeSection.DIGEST -> "Low-priority noise, contained"
                                 HomeSection.HISTORY -> "Done, archived and past alerts"
-                                HomeSection.DELETED -> "Deleted by senders, saved by NotiFlow"
+                                HomeSection.DELETED -> "Removed by source apps, preserved in NotiFlow"
                                 HomeSection.EXPENSES -> "100% offline bank & UPI spending tracker"
-                                HomeSection.INSIGHTS -> "Screen-time & notification distraction insights"
+                                HomeSection.INSIGHTS -> "Notification activity & distraction insights"
                             },
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -359,7 +359,7 @@ fun HomeScreen(
                     if (deletedItems.isNotEmpty()) {
                         item {
                             InteractiveMetricCard(
-                                label = "Deleted",
+                                label = "Source removed",
                                 count = deletedItems.size,
                                 icon = Icons.Outlined.Security,
                                 accentColor = Color(0xFFEF4444),
@@ -413,8 +413,8 @@ fun HomeScreen(
                             Icons.Outlined.History
                         )
                         HomeSection.DELETED -> Triple(
-                            "No deleted messages",
-                            "When someone deletes a WhatsApp or Telegram message, NotiFlow preserves it here.",
+                            "No source-removed notifications",
+                            "Notifications canceled by their source apps can be preserved here. This does not prove a sender used “Delete for everyone”.",
                             Icons.Outlined.Security
                         )
                         HomeSection.EXPENSES -> Triple(

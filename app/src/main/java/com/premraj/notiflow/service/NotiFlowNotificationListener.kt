@@ -215,6 +215,7 @@ class NotiFlowNotificationListener : NotificationListenerService() {
 
         val quietBySource = sbn.packageName in graph.preferences.quietPackages()
         val quietByCategory = stored.category in graph.preferences.quietCategories()
+        val focusActive = graph.focusEngine.currentStatus().isActive
 
         // Destructive quieting only after final stored classification.
         // Never quiet VIP/high/normal items. Require confidence >= 0.90 and safe low-value category.
@@ -230,7 +231,7 @@ class NotiFlowNotificationListener : NotificationListenerService() {
             initial.category in setOf(NotificationCategory.OTP, NotificationCategory.PAYMENT)
 
         val shouldQuiet =
-            (quietBySource || quietByCategory) &&
+            (quietBySource || quietByCategory || focusActive) &&
             !stored.isVip &&
             !stored.pinned &&
             !sensitiveByDeterministicRules &&
@@ -240,6 +241,11 @@ class NotiFlowNotificationListener : NotificationListenerService() {
 
         if (shouldQuiet) {
             runCatching { cancelNotification(sbn.key) }
+                .onSuccess {
+                    if (focusActive) {
+                        graph.preferences.focusBlockedCount = graph.preferences.focusBlockedCount + 1
+                    }
+                }
         }
     }
 
@@ -286,10 +292,11 @@ class NotiFlowNotificationListener : NotificationListenerService() {
         }
     }
 
-    override fun onNotificationRemoved(sbn: StatusBarNotification) {
+    override fun onNotificationRemoved(sbn: StatusBarNotification, rankingMap: RankingMap, reason: Int) {
         if (sbn.packageName == packageName) return
+        val removedBySource = reason == REASON_APP_CANCEL || reason == REASON_APP_CANCEL_ALL
         scope.launch {
-            appGraph.store.markRemoved(sbn.key)
+            appGraph.store.markRemoved(sbn.key, removedBySource = removedBySource)
         }
     }
 

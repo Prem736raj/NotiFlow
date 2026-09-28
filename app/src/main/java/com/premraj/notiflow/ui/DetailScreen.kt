@@ -262,8 +262,8 @@ fun DetailScreen(
                 }
             }
 
-            // Message Deleted By Sender Card
-            if (item.isDeletedBySender) {
+            // Source-app removal card. Android does not prove a remote sender deleted a message.
+            if (item.isRemovedBySource) {
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -285,7 +285,7 @@ fun DetailScreen(
                                     modifier = Modifier.size(20.dp)
                                 )
                                 Text(
-                                    text = "MESSAGE DELETED BY SENDER",
+                                    text = "REMOVED BY SOURCE APP",
                                     style = MaterialTheme.typography.labelMedium.copy(
                                         letterSpacing = 1.2.sp,
                                         fontWeight = FontWeight.Bold
@@ -295,7 +295,7 @@ fun DetailScreen(
                             }
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                text = "The sender deleted this message for everyone, but NotiFlow intercepted and preserved the original message text safely.",
+                                text = "The source app canceled this notification after NotiFlow captured it. Android does not reveal whether a remote sender used “Delete for everyone”.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

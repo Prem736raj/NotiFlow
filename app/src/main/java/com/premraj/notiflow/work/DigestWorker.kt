@@ -33,6 +33,7 @@ class DigestWorker(
         }
         if (items.isEmpty()) {
             graph.preferences.lastDigestAt = now
+            graph.workScheduler.scheduleNextDigest()
             return Result.success()
         }
 
@@ -40,6 +41,7 @@ class DigestWorker(
         val lowValue = items.filter { LocalIntelligence.effectivePriority(it, now) != NotificationPriority.HIGH }
         if (lowValue.isEmpty()) {
             graph.preferences.lastDigestAt = now
+            graph.workScheduler.scheduleNextDigest()
             return Result.success()
         }
 
@@ -92,6 +94,7 @@ class DigestWorker(
             .build()
 
         if (!NotificationPosting.canPost(applicationContext, NotificationChannels.DIGESTS)) {
+            graph.workScheduler.scheduleNextDigest()
             return Result.success()
         }
 
@@ -99,7 +102,10 @@ class DigestWorker(
             postNotification(7001, notification)
             graph.preferences.lastDigestAt = now
         }.fold(
-            onSuccess = { Result.success() },
+            onSuccess = {
+                graph.workScheduler.scheduleNextDigest()
+                Result.success()
+            },
             onFailure = { Result.retry() }
         )
     }

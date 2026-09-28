@@ -68,6 +68,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -85,6 +86,7 @@ import com.premraj.notiflow.data.VoiceReaderFilter
 import com.premraj.notiflow.data.VoiceReadingDetail
 import com.premraj.notiflow.data.VoiceTriggerCondition
 import com.premraj.notiflow.intelligence.ModelDownloadStatus
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -102,10 +104,13 @@ fun SettingsScreen(
     val isHeadphonesConnected by viewModel.isHeadphonesConnected.collectAsStateWithLifecycle()
     val downloadStatus by viewModel.modelDownloadStatus.collectAsStateWithLifecycle()
     val prefs = viewModel.preferences
+    val scope = rememberCoroutineScope()
 
     var clearConfirm by remember { mutableStateOf(false) }
     var backupDialog by remember { mutableStateOf(false) }
     var backupPassphrase by remember { mutableStateOf("") }
+    var archiveCreating by remember { mutableStateOf(false) }
+    var archiveError by remember { mutableStateOf<String?>(null) }
     var postGranted by remember(prefVersion) {
         mutableStateOf(
             Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
@@ -130,8 +135,10 @@ fun SettingsScreen(
     if (backupDialog) {
         AlertDialog(
             onDismissRequest = {
+                if (archiveCreating) return@AlertDialog
                 backupDialog = false
                 backupPassphrase = ""
+                archiveError = null
             },
             title = { Text("Protect encrypted archive") },
             text = {
@@ -146,29 +153,46 @@ fun SettingsScreen(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+                    archiveError?.let {
+                        Spacer(Modifier.height(8.dp))
+                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             },
             confirmButton = {
                 TextButton(
-                    enabled = backupPassphrase.length >= 12,
+                    enabled = backupPassphrase.length >= 12 && !archiveCreating,
                     onClick = {
-                        val backupText = viewModel.createEncryptedArchive(backupPassphrase)
-                        backupPassphrase = ""
-                        backupDialog = false
-                        val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_SUBJECT, "NotiFlow Encrypted Archive")
-                            putExtra(Intent.EXTRA_TEXT, backupText)
+                        val password = backupPassphrase
+                        archiveCreating = true
+                        archiveError = null
+                        scope.launch {
+                            runCatching { viewModel.createEncryptedArchive(password) }
+                                .onSuccess { backupText ->
+                                    backupPassphrase = ""
+                                    backupDialog = false
+                                    val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(Intent.EXTRA_SUBJECT, "NotiFlow Encrypted Archive")
+                                        putExtra(Intent.EXTRA_TEXT, backupText)
+                                    }
+                                    context.startActivity(Intent.createChooser(sendIntent, "Export Encrypted Archive"))
+                                }
+                                .onFailure { error ->
+                                    archiveError = error.message ?: "Could not create encrypted archive."
+                                }
+                            archiveCreating = false
                         }
-                        context.startActivity(Intent.createChooser(sendIntent, "Export Encrypted Archive"))
                     }
-                ) { Text("Create archive") }
+                ) { Text(if (archiveCreating) "Creating…" else "Create archive") }
             },
             dismissButton = {
                 TextButton(
+                    enabled = !archiveCreating,
                     onClick = {
                         backupDialog = false
                         backupPassphrase = ""
+                        archiveError = null
                     }
                 ) { Text("Cancel") }
             }
@@ -250,7 +274,7 @@ fun SettingsScreen(
 
                 SettingsCard(Icons.Outlined.DoNotDisturbOn, "Context Focus Mode") {
                     Text(
-                        "Track manual and scheduled focus profiles. Notification suppression remains disabled until its safety policy is fully verified.",
+                        "Manual and scheduled focus profiles suppress only confidently identified low-value promotions, spam, and social noise. VIP, pinned, OTP, payment, High, and Normal priority notifications are never suppressed by Focus Mode.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -268,7 +292,7 @@ fun SettingsScreen(
                                 color = if (focusStatus.isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = if (focusStatus.isActive) "Focus profile active; suppression policy is not yet enforced" else "Normal notification flow",
+                                text = if (focusStatus.isActive) "Focus profile active · ${focusStatus.blockedCount} low-value alert${if (focusStatus.blockedCount == 1) "" else "s"} suppressed" else "Normal notification flow",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -287,14 +311,14 @@ fun SettingsScreen(
 
                     SettingSwitch(
                         title = "Sleep schedule profile (11 PM - 7 AM)",
-                        subtitle = "Marks the sleep focus profile active during this schedule. Notification suppression is not yet enforced.",
+                        subtitle = "Applies the conservative low-value suppression policy during this schedule.",
                         checked = prefs.sleepFocusScheduled,
                         onChecked = viewModel::setSleepFocusScheduled
                     )
 
                     SettingSwitch(
                         title = "Work hours profile (Mon-Fri, 9 AM - 5 PM)",
-                        subtitle = "Marks the work focus profile active during office hours. Notification suppression is not yet enforced.",
+                        subtitle = "Applies the conservative low-value suppression policy during office hours.",
                         checked = prefs.workFocusScheduled,
                         onChecked = viewModel::setWorkFocusScheduled
                     )

@@ -38,6 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -61,7 +62,7 @@ import java.util.Locale
 fun ExpensesDashboard(
     notifications: List<NotificationItem>,
     expenses: List<ExpenseTransaction>,
-    onGetExpenseSummary: (ExpenseTimeRange) -> ExpenseSummary,
+    onGetExpenseSummary: suspend (ExpenseTimeRange) -> ExpenseSummary,
     onOpenNotification: (NotificationItem) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -69,8 +70,12 @@ fun ExpensesDashboard(
     var transactionFilter by remember { mutableStateOf<TransactionType?>(null) }
     val dark = isSystemInDarkTheme()
 
-    val summary = remember(selectedRange, expenses) {
-        onGetExpenseSummary(selectedRange)
+    val summary by produceState(
+        initialValue = ExpenseSummary(0.0, 0.0, 0.0, 0, 0, emptyMap(), emptyList()),
+        key1 = selectedRange,
+        key2 = expenses
+    ) {
+        value = onGetExpenseSummary(selectedRange)
     }
 
     val filteredTransactions = remember(summary.transactions, transactionFilter) {

@@ -75,7 +75,7 @@ class NotificationStore(context: Context) {
                     put("is_vip", if (isVip) 1 else 0)
                     put("read", if (existing?.read == true) 1 else 0)
                     classification.amountHint?.let { put("amount_hint", it) } ?: existing?.amountHint?.let { put("amount_hint", it) }
-                    put("is_deleted_by_sender", if (existing?.isDeletedBySender == true) 1 else 0)
+                    put("is_removed_by_source", if (existing?.isRemovedBySource == true) 1 else 0)
                 }
 
                 val rowId = if (existing == null) {
@@ -132,7 +132,7 @@ class NotificationStore(context: Context) {
         }
     }
 
-    suspend fun markRemoved(notificationKey: String) = withContext(Dispatchers.IO) {
+    suspend fun markRemoved(notificationKey: String, removedBySource: Boolean = false) = withContext(Dispatchers.IO) {
         mutationMutex.withLock {
             val db = helper.writableDatabase
             val existing = findByKey(db, notificationKey) ?: return@withLock
@@ -140,6 +140,7 @@ class NotificationStore(context: Context) {
                 put("is_active", 0)
                 put("removed_at", System.currentTimeMillis())
                 put("updated_at", System.currentTimeMillis())
+                if (removedBySource) put("is_removed_by_source", 1)
             }
             db.update(TABLE, values, "id=?", arrayOf(existing.id.toString()))
             updateCacheFromDb(existing.id)
@@ -211,6 +212,10 @@ class NotificationStore(context: Context) {
     suspend fun itemsSince(timestamp: Long): List<NotificationItem> =
         itemsBetween(timestamp, System.currentTimeMillis())
 
+    suspend fun allItems(): List<NotificationItem> = withContext(Dispatchers.IO) {
+        query()
+    }
+
     suspend fun itemsBetween(
         sinceExclusive: Long,
         untilInclusive: Long,
@@ -278,9 +283,9 @@ class NotificationStore(context: Context) {
         val db = helper.readableDatabase
         val since = System.currentTimeMillis() - withinMillis
         val selection = if (sender.isNullOrBlank()) {
-            "package_name = ? AND posted_at >= ? AND body IS NOT NULL AND body != '' AND is_deleted_by_sender = 0"
+            "package_name = ? AND posted_at >= ? AND body IS NOT NULL AND body != '' AND is_removed_by_source = 0"
         } else {
-            "package_name = ? AND (sender = ? OR title = ?) AND posted_at >= ? AND body IS NOT NULL AND body != '' AND is_deleted_by_sender = 0"
+            "package_name = ? AND (sender = ? OR title = ?) AND posted_at >= ? AND body IS NOT NULL AND body != '' AND is_removed_by_source = 0"
         }
         val args = if (sender.isNullOrBlank()) {
             arrayOf(packageName, since.toString())
@@ -301,20 +306,9 @@ class NotificationStore(context: Context) {
         }
     }
 
-    suspend fun markDeletedBySender(id: Long): NotificationItem? = withContext(Dispatchers.IO) {
-        mutationMutex.withLock {
-            val values = ContentValues().apply {
-                put("is_deleted_by_sender", 1)
-                put("updated_at", System.currentTimeMillis())
-            }
-            helper.writableDatabase.update(TABLE, values, "id=?", arrayOf(id.toString()))
-            updateCacheFromDb(id)
-        }
-    }
-
-    suspend fun countDeletedMessages(): Int = withContext(Dispatchers.IO) {
+    suspend fun countRemovedBySource(): Int = withContext(Dispatchers.IO) {
         helper.readableDatabase.rawQuery(
-            "SELECT COUNT(*) FROM $TABLE WHERE is_deleted_by_sender = 1",
+            "SELECT COUNT(*) FROM $TABLE WHERE is_removed_by_source = 1",
             null
         ).use { cursor ->
             if (cursor.moveToFirst()) cursor.getInt(0) else 0
@@ -357,35 +351,70 @@ class NotificationStore(context: Context) {
         }
     }
 
-    fun getExpenseSummary(since: Long = 0L, until: Long = Long.MAX_VALUE): ExpenseSummary {
-        val list = queryExpenses("timestamp >= ? AND timestamp <= ?", arrayOf(since.toString(), until.toString()))
-        var totalDebit = 0.0
-        var totalCredit = 0.0
-        var debitCount = 0
-        var creditCount = 0
-        val categoryMap = mutableMapOf<ExpenseCategory, Double>()
+    suspend fun getExpenseSummary(since: Long = 0L, until: Long = Long.MAX_VALUE): ExpenseSummary =
+        withContext(Dispatchers.IO) {
+            val list = queryExpenses("timestamp >= ? AND timestamp <= ?", arrayOf(since.toString(), until.toString()))
+            var totalDebit = 0.0
+            var totalCredit = 0.0
+            var debitCount = 0
+            var creditCount = 0
+            val categoryMap = mutableMapOf<ExpenseCategory, Double>()
 
-        for (tx in list) {
-            if (tx.transactionType == TransactionType.DEBIT) {
-                totalDebit += tx.amount
-                debitCount++
-                val curr = categoryMap.getOrDefault(tx.expenseCategory, 0.0)
-                categoryMap[tx.expenseCategory] = curr + tx.amount
-            } else {
-                totalCredit += tx.amount
-                creditCount++
+            for (tx in list) {
+                if (tx.transactionType == TransactionType.DEBIT) {
+                    totalDebit += tx.amount
+                    debitCount++
+                    val curr = categoryMap.getOrDefault(tx.expenseCategory, 0.0)
+                    categoryMap[tx.expenseCategory] = curr + tx.amount
+                } else {
+                    totalCredit += tx.amount
+                    creditCount++
+                }
             }
+
+            ExpenseSummary(
+                totalDebit = totalDebit,
+                totalCredit = totalCredit,
+                netBalanceDiff = totalCredit - totalDebit,
+                debitCount = debitCount,
+                creditCount = creditCount,
+                categoryBreakdown = categoryMap,
+                transactions = list
+            )
         }
 
-        return ExpenseSummary(
-            totalDebit = totalDebit,
-            totalCredit = totalCredit,
-            netBalanceDiff = totalCredit - totalDebit,
-            debitCount = debitCount,
-            creditCount = creditCount,
-            categoryBreakdown = categoryMap,
-            transactions = list
-        )
+    suspend fun synchronizeVipFlags(rules: Set<String>) = withContext(Dispatchers.IO) {
+        mutationMutex.withLock {
+            val db = helper.writableDatabase
+            db.beginTransaction()
+            try {
+                db.query(TABLE, arrayOf("id", "package_name", "sender", "is_vip"), null, null, null, null, null).use { cursor ->
+                    val idIndex = cursor.getColumnIndexOrThrow("id")
+                    val packageIndex = cursor.getColumnIndexOrThrow("package_name")
+                    val senderIndex = cursor.getColumnIndexOrThrow("sender")
+                    val vipIndex = cursor.getColumnIndexOrThrow("is_vip")
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getLong(idIndex)
+                        val packageName = cursor.getString(packageIndex)
+                        val sender = if (cursor.isNull(senderIndex)) null else cursor.getString(senderIndex)
+                        val normalizedSender = sender.orEmpty().trim().lowercase()
+                        val shouldBeVip = "$packageName|" in rules || "$packageName|$normalizedSender" in rules
+                        val isVip = cursor.getInt(vipIndex) == 1
+                        if (isVip != shouldBeVip) {
+                            val values = ContentValues().apply {
+                                put("is_vip", if (shouldBeVip) 1 else 0)
+                                put("updated_at", System.currentTimeMillis())
+                            }
+                            db.update(TABLE, values, "id=?", arrayOf(id.toString()))
+                        }
+                    }
+                }
+                db.setTransactionSuccessful()
+            } finally {
+                db.endTransaction()
+            }
+            refreshFromDb()
+        }
     }
 
     private suspend fun update(id: Long, fill: ContentValues.() -> Unit) = withContext(Dispatchers.IO) {
@@ -422,9 +451,9 @@ class NotificationStore(context: Context) {
         selection: String? = null,
         args: Array<String>? = null,
         order: String = "timestamp DESC",
-        limit: Int = 5000
+        limit: Int? = null
     ): List<ExpenseTransaction> {
-        return helper.readableDatabase.query(TABLE_EXPENSES, null, selection, args, null, null, order, limit.toString()).use { cursor ->
+        return helper.readableDatabase.query(TABLE_EXPENSES, null, selection, args, null, null, order, limit?.toString()).use { cursor ->
             buildList {
                 while (cursor.moveToNext()) add(cursor.toExpense())
             }
@@ -435,10 +464,10 @@ class NotificationStore(context: Context) {
         selection: String? = null,
         args: Array<String>? = null,
         order: String = "pinned DESC, posted_at DESC",
-        limit: Int = 5000
+        limit: Int? = null
     ): List<NotificationItem> {
         val allExpenses = queryExpenses().associateBy { it.notificationId }
-        return helper.readableDatabase.query(TABLE, null, selection, args, null, null, order, limit.toString()).use { cursor ->
+        return helper.readableDatabase.query(TABLE, null, selection, args, null, null, order, limit?.toString()).use { cursor ->
             buildList {
                 while (cursor.moveToNext()) {
                     val id = cursor.getLong(cursor.getColumnIndexOrThrow("id"))
@@ -462,14 +491,12 @@ class NotificationStore(context: Context) {
         }
         _items.value = (_items.value.filterNot { it.id == id } + item)
             .sortedWith(compareByDescending<NotificationItem> { it.pinned }.thenByDescending { it.postedAt })
-            .take(CACHE_LIMIT)
         val expense = item.expenseTransaction
         _expenses.value = if (expense == null) {
             _expenses.value.filterNot { it.notificationId == id }
         } else {
             (_expenses.value.filterNot { it.notificationId == id } + expense)
                 .sortedByDescending { it.timestamp }
-                .take(CACHE_LIMIT)
         }
         return item
     }
@@ -509,7 +536,7 @@ class NotificationStore(context: Context) {
         isVip = getInt(col("is_vip")) == 1,
         read = getInt(col("read")) == 1,
         amountHint = getNullableDouble("amount_hint"),
-        isDeletedBySender = getIntOrZero("is_deleted_by_sender") == 1,
+        isRemovedBySource = getIntOrZero("is_removed_by_source") == 1,
         expenseTransaction = expense
     )
 
@@ -553,7 +580,7 @@ class NotificationStore(context: Context) {
                     is_vip INTEGER NOT NULL DEFAULT 0,
                     read INTEGER NOT NULL DEFAULT 0,
                     amount_hint REAL,
-                    is_deleted_by_sender INTEGER NOT NULL DEFAULT 0
+                    is_removed_by_source INTEGER NOT NULL DEFAULT 0
                 )
                 """.trimIndent()
             )
@@ -561,7 +588,7 @@ class NotificationStore(context: Context) {
             db.execSQL("CREATE INDEX idx_notifications_package ON $TABLE(package_name)")
             db.execSQL("CREATE INDEX idx_notifications_state ON $TABLE(state)")
             db.execSQL("CREATE INDEX idx_notifications_category ON $TABLE(category)")
-            db.execSQL("CREATE INDEX idx_notifications_deleted ON $TABLE(is_deleted_by_sender)")
+            db.execSQL("CREATE INDEX idx_notifications_source_removed ON $TABLE(is_removed_by_source)")
 
             createExpenseTable(db)
         }
@@ -573,6 +600,12 @@ class NotificationStore(context: Context) {
             }
             if (oldVersion < 3) {
                 createExpenseTable(db)
+            }
+            if (oldVersion < 4) {
+                db.execSQL("ALTER TABLE $TABLE ADD COLUMN is_removed_by_source INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("UPDATE $TABLE SET is_removed_by_source = is_deleted_by_sender WHERE is_deleted_by_sender = 1")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_notifications_source_removed ON $TABLE(is_removed_by_source)")
+                db.execSQL("DROP INDEX IF EXISTS idx_notifications_deleted")
             }
         }
 
@@ -603,10 +636,9 @@ class NotificationStore(context: Context) {
 
     private companion object {
         const val DB_NAME = "notiflow.db"
-        const val DB_VERSION = 3
+        const val DB_VERSION = 4
         const val TABLE = "notifications"
         const val TABLE_EXPENSES = "expense_transactions"
-        const val CACHE_LIMIT = 5000
     }
 }
 

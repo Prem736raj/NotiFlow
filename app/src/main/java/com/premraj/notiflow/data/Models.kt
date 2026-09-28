@@ -89,7 +89,7 @@ data class NotificationItem(
     val isVip: Boolean,
     val read: Boolean,
     val amountHint: Double?,
-    val isDeletedBySender: Boolean = false,
+    val isRemovedBySource: Boolean = false,
     val expenseTransaction: ExpenseTransaction? = null
 ) {
     val displayTitle: String

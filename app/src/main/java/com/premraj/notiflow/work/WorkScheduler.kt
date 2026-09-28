@@ -44,14 +44,23 @@ class WorkScheduler(
             workManager.cancelUniqueWork(DIGEST_WORK)
             return
         }
-        val delay = millisUntilNext(preferences.digestHour, preferences.digestMinute)
-        val request = PeriodicWorkRequestBuilder<DigestWorker>(24, TimeUnit.HOURS)
-            .setInitialDelay(delay, TimeUnit.MILLISECONDS)
-            .build()
-        workManager.enqueueUniquePeriodicWork(
+        workManager.enqueueUniqueWork(
             DIGEST_WORK,
-            if (updateExisting) ExistingPeriodicWorkPolicy.UPDATE else ExistingPeriodicWorkPolicy.KEEP,
-            request
+            if (updateExisting) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
+            digestRequest()
+        )
+    }
+
+    /**
+     * Called by DigestWorker after a successful/best-effort daily run. Recomputing
+     * the next local clock target avoids cumulative 24-hour periodic-work drift.
+     */
+    fun scheduleNextDigest() {
+        if (!preferences.digestEnabled) return
+        workManager.enqueueUniqueWork(
+            DIGEST_WORK,
+            ExistingWorkPolicy.APPEND_OR_REPLACE,
+            digestRequest()
         )
     }
 
@@ -67,6 +76,13 @@ class WorkScheduler(
             request
         )
     }
+
+    private fun digestRequest() = OneTimeWorkRequestBuilder<DigestWorker>()
+        .setInitialDelay(
+            millisUntilNext(preferences.digestHour, preferences.digestMinute),
+            TimeUnit.MILLISECONDS
+        )
+        .build()
 
     private fun millisUntilNext(hour: Int, minute: Int): Long {
         val now = Calendar.getInstance()

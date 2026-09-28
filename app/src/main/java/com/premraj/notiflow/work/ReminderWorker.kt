@@ -66,6 +66,9 @@ class ReminderWorker(
             .build()
 
         if (!NotificationPosting.canPost(applicationContext, NotificationChannels.REMINDERS)) {
+            // The due time has passed. Do not leave the item stranded in Later forever
+            // when Android or the user has disabled this delivery channel.
+            applicationContext.appGraph.store.setState(id, NotificationState.ACTIVE)
             return Result.success()
         }
 

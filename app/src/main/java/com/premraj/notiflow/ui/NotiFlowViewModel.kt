@@ -67,6 +67,9 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
         refreshStorageStats()
         refreshUnwantedCount()
         viewModelScope.launch {
+            graph.store.synchronizeVipFlags(graph.preferences.vipRules())
+        }
+        viewModelScope.launch {
             notifications.collect {
                 refreshUnwantedCount()
             }
@@ -114,7 +117,7 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
 
     fun setVip(item: NotificationItem, enabled: Boolean) = viewModelScope.launch {
         graph.preferences.setVip(item.packageName, item.sender, enabled)
-        graph.store.setVip(item.id, enabled)
+        graph.store.synchronizeVipFlags(graph.preferences.vipRules())
         if (!enabled && !item.priorityOverridden) {
             val learnedPriority = graph.preferences.matchingPreference(item.packageName, item.sender)?.priority
             val basePriority = learnedPriority ?: LocalIntelligence.classify(
@@ -199,7 +202,7 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
         bumpPrefs()
     }
 
-    fun getExpenseSummary(range: ExpenseTimeRange): ExpenseSummary {
+    suspend fun getExpenseSummary(range: ExpenseTimeRange): ExpenseSummary {
         val cal = Calendar.getInstance()
         val (since, until) = when (range) {
             ExpenseTimeRange.TODAY -> {
@@ -240,15 +243,17 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
         bumpPrefs()
     }
 
-    fun setVipApp(packageName: String, enabled: Boolean) {
+    fun setVipApp(packageName: String, enabled: Boolean) = viewModelScope.launch {
         graph.preferences.setVip(packageName, null, enabled)
+        graph.store.synchronizeVipFlags(graph.preferences.vipRules())
         bumpPrefs()
     }
 
-    fun removeVipRule(token: String) {
+    fun removeVipRule(token: String) = viewModelScope.launch {
         val pkg = token.substringBefore('|')
         val sender = token.substringAfter('|').takeIf { it.isNotBlank() }
         graph.preferences.setVip(pkg, sender, false)
+        graph.store.synchronizeVipFlags(graph.preferences.vipRules())
         bumpPrefs()
     }
 
@@ -347,12 +352,15 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
         bumpPrefs()
     }
 
-    fun createEncryptedArchive(password: String): String {
-        return BackupExporter.createEncryptedBackup(
-            notifications = notifications.value,
-            preferences = graph.preferences,
-            password = password
-        )
+    suspend fun createEncryptedArchive(password: String): String {
+        val allNotifications = graph.store.allItems()
+        return withContext(Dispatchers.Default) {
+            BackupExporter.createEncryptedBackup(
+                notifications = allNotifications,
+                preferences = graph.preferences,
+                password = password
+            )
+        }
     }
 
     fun refreshObservedApps() = viewModelScope.launch {

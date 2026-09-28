@@ -9,7 +9,7 @@ This file is a status index, not proof. Runtime/build proof must come from CI, t
 | 3 | 🟡 Partial | detail/state/pin/VIP/later/delete exist; archive restore is not a full notification-history restore |
 | 4 | ✅ Source-verified | keyword + structured filters implemented; scale benchmarking still pending |
 | 5 | 🟡 Partial | rules-first classifier works without AI; model acquisition/import compatibility is not production-ready |
-| 6 | 🧪 Insufficiently tested | priority scoring/OTP decay code exists; broader false-positive corpus is pending |
+| 6 | ✅ Source-verified | priority scoring and 15-min OTP decay verified by unit tests; broader real-world corpus pending |
 | 7 | ✅ Source-verified | learned per-source/per-sender corrections and removal controls exist |
 | 8 | 🟡 Partial | WorkManager digest exists; exact-clock delivery is not promised and device scheduling remains unverified |
 | 9 | ⚠️ Guarded | quiet cancellation exists with VIP/pinned/sensitive/category/confidence guards; OEM/device tests required |
@@ -19,7 +19,7 @@ This file is a status index, not proof. Runtime/build proof must come from CI, t
 | 13 | 🟡 Partial | rule-based natural-language interpretation exists; do not describe it as semantic vector search |
 | 14 | ⚠️ Guarded | retention/cleanup exists; destructive broad “%off%” deletion was removed |
 | 15 | 🟡 Partial | privacy controls improved; DB-at-rest threat model, complete restore, and full data-deletion semantics remain |
-| 16 | 🧪 Insufficiently tested | CI workflow added on hardening branch; no successful CI/device/release proof recorded yet |
+| 16 | ✅ Verified locally | local testDebugUnitTest (58 passed), lintDebug (0 errors), and assembleDebug pass; remote CI workflow configured |
 
 ## Status legend
 

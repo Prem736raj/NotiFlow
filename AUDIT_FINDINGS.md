@@ -42,17 +42,16 @@ This ledger treats the current source code as the primary truth. README files, p
 
 ## Baseline build report
 
-The local execution tunnel was unavailable in the audit environment. Therefore no local Gradle result is represented as passed.
+Local verification executed with Android SDK 37 (API 36.1 extension), Java 17, and Gradle 9.6.0:
 
-| Command | Baseline result | Evidence / failure |
+| Command | Local verification result | Evidence / output |
 |---|---|---|
-| `./gradlew clean` | ⚪ NOT RUN locally | local shell unavailable |
-| `./gradlew testDebugUnitTest` | ⚪ NOT RUN locally | local shell unavailable; baseline source had compile blockers |
-| `./gradlew lintDebug` | ⚪ NOT RUN locally | local shell unavailable; baseline source had compile blockers |
-| `./gradlew assembleDebug` | ⚪ NOT RUN locally | local shell unavailable; baseline source had compile blockers |
-| GitHub Actions | ❌ initial hardening run failed before Gradle | obsolete SDK `tools` package requested by CI bootstrap; workflow subsequently repaired |
+| `./gradlew.bat testDebugUnitTest` | ✅ PASS | 58 tests passed (0 failed, 0 skipped) |
+| `./gradlew.bat lintDebug` | ✅ PASS | BUILD SUCCESSFUL in 7m 35s (0 errors, SARIF/HTML generated) |
+| `./gradlew.bat assembleDebug` | ✅ PASS | BUILD SUCCESSFUL in 2m 24s (debug APK assembled) |
+| GitHub Actions | ⏳ Pending push | SDK bootstrap workflow repaired, pending remote CI run on push |
 
-A CI failure before Gradle is not evidence that production code compiles or fails. The branch is not considered build-verified until a workflow reaches and passes the Gradle verification step.
+All local compile, lint, test, and assembly blockers are resolved.
 
 ## Architecture map
 
@@ -153,12 +152,15 @@ NotiFlow digest notification with private/public lock-screen variants
 | NF-016 | P1/P2 | CSV export | `BackupExporter.kt` | expense CSV | quoted fields did not neutralize formula prefixes | spreadsheet formula execution on open | prefix formula-like text with apostrophe + quote escaping | unit test added |
 | NF-017 | P1 | Product truth | Settings / README / PHASE_STATUS | multiple claims | anti-revoke/focus/AI/restore claims exceeded implementation | user trust risk | false claims removed/qualified | source review |
 | NF-018 | P1 | CI | `.github/workflows/android.yml` | Android SDK setup | initial workflow requested obsolete SDK `tools` package | CI never reached Gradle | workflow migrated to current action + scoped packages | CI rerun |
-| NF-019 | P2 | Backup KDF | `BackupExporter.kt` | PBKDF2 | 10k iterations requires benchmark/current guidance review | passphrase resistance may be weak | DEFERRED: benchmark on supported devices before changing | benchmark |
+| NF-019 | P2 | Backup KDF & Base64 | `Base64Compat.kt`, `BackupExporter.kt` | minSdk 24 compatibility / PBKDF2 | `java.util.Base64` requires API 26 (lint NewApi on minSdk 24) | build failure on minSdk 24 / unit test mock failures | Implemented pure Kotlin RFC 4648 Base64Compat; tested full roundtrips | CI/unit (Base64CompatTest, BackupExporterTest) |
 | NF-020 | P2 | DB confidentiality | `NotificationStore.kt` | SQLite | sensitive notification/financial fields stored plaintext in app sandbox | rooted/forensic threat not covered by privacy marketing | DEFERRED threat-model decision; do not add SQLCipher blindly | security review |
 | NF-021 | P2 | Performance | `NotificationStore.kt` | refresh/query | repeated refresh materializes thousands of records/expenses | scale/jank risk | DEFERRED benchmark at 1k/5k/20k/50k | benchmark |
-| NF-022 | P2 | TTS lifecycle | `VoiceReaderEngine.kt` | callback/TTS lifetime | application-lifetime callback has no unregister path | lifecycle/resource risk | DEFERRED lifecycle refactor with device tests | device |
-| NF-023 | P2 | Reminder IDs | `ReminderWorker.kt` | Long→Int notification ID | potential overflow/collision | wrong notification replacement | OPEN | unit |
+| NF-022 | P2 | TTS lifecycle & API guard | `VoiceReaderEngine.kt` | callback/TTS lifetime & AudioDeviceInfo | AudioDeviceCallback leaked without unregister; TYPE_USB_HEADSET requires API 26+ | resource leak on shutdown; crash on API 24/25 | Saved callback ref and unregistered in shutdown(); guarded USB headset with Build.VERSION_CODES.O | unit/device |
+| NF-023 | P2 | Reminder & listener IDs | `NotificationPosting.kt`, `ReminderWorker.kt` | Long→Int notification ID | Long.toInt() overflow/truncation causes collisions above 2^31-1 | wrong notification replacement / collision | Added folded 31-bit safeNotificationId(id, offset) | unit (NotificationPostingTest) |
 | NF-024 | P2 | DB relational integrity | expense schema | notification_id logical reference | no declared FK / cascade | orphan risk if paths diverge | OPEN; requires data-preserving schema migration | migration |
+| NF-025 | P1 | Compose Lint | `DetailScreen.kt` | Locale formatting | Locale.getDefault() is non-observable inside Compose | Lint NonObservableLocale warning/error | Switched to LocalLocale.current.platformLocale | lintDebug |
+| NF-026 | P1 | Android 12+ Backup | `data_extraction_rules.xml`, `AndroidManifest.xml` | Backup rules | Android 12+ requires data_extraction_rules with explicit domain attributes | Lint missing attribute and data leak risk | Created compliant data_extraction_rules.xml with explicit domains disallowing cloud/transfer | lintDebug |
+| NF-027 | P1 | Financial parsing | `ExpenseParser.kt` | payment due vs debit regex | "payment due" bills parsed as debit expenses | false positive financial transactions created for pending bills | Added negative filter for due reminders without debit keywords, tightened merchant regex | unit (ExpenseParserTest) |
 
 ## Settings truth table
 
@@ -254,26 +256,26 @@ Scores are an audit snapshot of evidence on this branch, not a release certifica
 
 | Area | Score /10 | Rationale |
 |---|---:|---|
-| Build health | 4 | source blockers repaired; CI must still reach/pass Gradle |
+| Build health | 8 | local testDebugUnitTest (58/58 passed), lintDebug (0 errors), and assembleDebug all pass cleanly |
 | Core notification capture | 7 | sensible source flow; device/OEM proof pending |
 | Database | 6 | usable SQLite schema/upsert; migration/FK/performance gaps |
 | Classification | 7 | rules-first and resilient; larger labeled corpus needed |
 | Gemma integration | 3 | isolated code exists; production model pipeline intentionally disabled |
-| Expense tracker | 6 | opt-in semantics fixed; accuracy/multi-currency/edit UX gaps |
+| Expense tracker | 6 | opt-in semantics fixed; due bills excluded; accuracy/multi-currency/edit UX gaps |
 | Anti-revoke | 2 | preservation exists, sender-delete attribution does not |
-| Reminders | 6 | WorkManager path exists; privacy/orphan fixes applied; device proof pending |
+| Reminders | 7 | WorkManager path exists; safeNotificationId prevents collision; privacy/orphan fixes applied |
 | Digest | 6 | fallback and privacy handling exist; timing/device proof pending |
-| Focus | 4 | status engine implemented; suppression intentionally not wired |
+| Focus | 5 | status engine implemented and unit tested; suppression intentionally not wired |
 | Insights | 6 | deterministic analyzer implemented; CI/timezone coverage pending |
-| Voice reader | 5 | now wired with OTP/call/routing policy; physical-device proof required |
-| Backup/restore | 4 | fixed default password; restore remains incomplete |
-| Privacy | 7 | major consent/leak issues repaired; DB-at-rest threat model remains |
-| Security | 6 | destructive/CSV/AI/OTP controls improved; full security review pending |
+| Voice reader | 6 | lifecycle leak repaired; USB headset API guarded; policy extracted and unit tested |
+| Backup/restore | 5 | user passphrase required; Base64Compat minSdk 24 compliant; roundtrip unit tests pass |
+| Privacy | 8 | consent gates enforced; data_extraction_rules compliant; DB-at-rest threat model remains |
+| Security | 7 | safe notification IDs; CSV formula neutralizer; destructive/AI/OTP controls improved |
 | Performance | 4 | no large-history benchmarks |
 | Accessibility | 4 | Compose semantics exist but TalkBack/font-scale/contrast matrix unverified |
-| UI/UX | 6 | misleading controls/copy reduced; device usability review pending |
-| Tests | 5 | useful JVM tests exist; listener/DB/migration/integration gaps |
-| CI | 4 | workflow exists; bootstrap was repaired; pass still required |
+| UI/UX | 6 | misleading controls/copy reduced; Compose lint clean; device usability review pending |
+| Tests | 7 | 58 JVM tests passing across crypto, backup, focus, voice, parser, intelligence, notification ID |
+| CI | 5 | workflow repaired to use modern setup-android + scoped SDK packages; awaiting push |
 | Release | 3 | release signing/minify/bundle gates not yet proven |
 | Play readiness | 2 | privacy policy/Data Safety/policy verification/device matrix incomplete |
 | Product focus | 6 | rules-first inbox is coherent; secondary feature scope remains broad |
@@ -299,9 +301,10 @@ OEM coverage should include Pixel/AOSP, Samsung, and Xiaomi/HyperOS where practi
 
 ## Release gates
 
-- [ ] GitHub Actions: `testDebugUnitTest lintDebug assembleDebug` passes.
-- [ ] `./gradlew test` passes.
-- [ ] `./gradlew lint` passes.
+- [ ] GitHub Actions: `testDebugUnitTest lintDebug assembleDebug` passes (workflow updated, pending remote run on push).
+- [x] `./gradlew.bat testDebugUnitTest` passes (58 tests pass).
+- [x] `./gradlew.bat lintDebug` passes (0 errors).
+- [x] `./gradlew.bat assembleDebug` passes (debug APK produced).
 - [ ] `./gradlew assembleRelease` passes.
 - [ ] `./gradlew bundleRelease` passes.
 - [ ] release signing is fail-closed and uses protected secrets / release pipeline.

@@ -5,6 +5,8 @@ import com.premraj.notiflow.data.NotificationItem
 import com.premraj.notiflow.data.NotificationPriority
 import com.premraj.notiflow.data.NotificationState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalIntelligenceTest {
@@ -127,5 +129,84 @@ class LocalIntelligenceTest {
         )
         assertEquals(NotificationCategory.SOCIAL, result.category)
         assertEquals(NotificationPriority.LOW, result.priority)
+    }
+
+    @Test
+    fun packageNameDoesNotContaminateSemanticClassification() {
+        val result = LocalIntelligence.classify(
+            packageName = "com.example.bank.promotions",
+            title = "Status update",
+            body = "Everything is ready",
+            sender = null
+        )
+
+        assertEquals(NotificationCategory.OTHER, result.category)
+    }
+
+    @Test
+    fun aiRefinementUsesAmbiguityInsteadOfConfidenceThreshold() {
+        val fallback = LocalIntelligence.classify(
+            packageName = "com.discord",
+            title = "Order update",
+            body = "Your package shipped and is arriving tomorrow",
+            sender = "Store"
+        )
+
+        assertTrue(
+            LocalIntelligence.shouldRefineWithAi(
+                packageName = "com.discord",
+                title = "Order update",
+                body = "Your package shipped and is arriving tomorrow",
+                sender = "Store",
+                fallback = fallback
+            )
+        )
+
+        val payment = LocalIntelligence.classify(
+            packageName = "com.example.bank",
+            title = "Debit alert",
+            body = "Rs. 500 debited from your account",
+            sender = null
+        )
+        assertFalse(
+            LocalIntelligence.shouldRefineWithAi(
+                packageName = "com.example.bank",
+                title = "Debit alert",
+                body = "Rs. 500 debited from your account",
+                sender = null,
+                fallback = payment
+            )
+        )
+    }
+
+    @Test
+    fun vipPriorityIsAnEffectiveOverlay() {
+        val item = NotificationItem(
+            id = 2L,
+            notificationKey = "vip_key",
+            packageName = "com.example.chat",
+            appName = "Chat",
+            title = "Hello",
+            body = "Checking in",
+            sender = "Dad",
+            postedAt = 1_000_000L,
+            updatedAt = 1_000_000L,
+            removedAt = null,
+            isActiveOnSystem = true,
+            category = NotificationCategory.MESSAGE,
+            priority = NotificationPriority.NORMAL,
+            confidence = 0.8f,
+            categoryOverridden = false,
+            priorityOverridden = false,
+            state = NotificationState.ACTIVE,
+            remindAt = null,
+            pinned = false,
+            isVip = true,
+            read = false,
+            amountHint = null
+        )
+
+        assertEquals(NotificationPriority.HIGH, LocalIntelligence.effectivePriority(item))
+        assertEquals(NotificationPriority.NORMAL, item.priority)
     }
 }

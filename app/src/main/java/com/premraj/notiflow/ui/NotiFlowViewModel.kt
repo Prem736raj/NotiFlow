@@ -25,6 +25,7 @@ import com.premraj.notiflow.data.VoiceReaderFilter
 import com.premraj.notiflow.data.VoiceReadingDetail
 import com.premraj.notiflow.data.VoiceTriggerCondition
 import com.premraj.notiflow.intelligence.InsightsAnalyzer
+import com.premraj.notiflow.intelligence.LocalIntelligence
 import com.premraj.notiflow.intelligence.ModelDownloadStatus
 import com.premraj.notiflow.util.BackupExporter
 import kotlinx.coroutines.Dispatchers
@@ -40,6 +41,7 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
     private val graph = application.appGraph
     val notifications: StateFlow<List<NotificationItem>> = graph.store.items
     val expenseTransactions: StateFlow<List<ExpenseTransaction>> = graph.store.expenses
+    val initialLoadComplete: StateFlow<Boolean> = graph.store.initialLoadComplete
 
     private val _preferencesVersion = MutableStateFlow(0)
     val preferencesVersion: StateFlow<Int> = _preferencesVersion.asStateFlow()
@@ -113,7 +115,16 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
     fun setVip(item: NotificationItem, enabled: Boolean) = viewModelScope.launch {
         graph.preferences.setVip(item.packageName, item.sender, enabled)
         graph.store.setVip(item.id, enabled)
-        if (enabled) graph.store.setPriority(item.id, NotificationPriority.HIGH, userOverride = false)
+        if (!enabled && !item.priorityOverridden) {
+            val learnedPriority = graph.preferences.matchingPreference(item.packageName, item.sender)?.priority
+            val basePriority = learnedPriority ?: LocalIntelligence.classify(
+                packageName = item.packageName,
+                title = item.title,
+                body = item.body,
+                sender = item.sender
+            ).priority
+            graph.store.setPriority(item.id, basePriority, userOverride = false)
+        }
         bumpPrefs()
     }
 
@@ -272,7 +283,7 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
 
     fun setLocalAiEnabled(enabled: Boolean) {
         graph.preferences.localAiEnabled = enabled
-        if (!enabled) graph.gemma.reset()
+        if (!enabled) viewModelScope.launch { graph.gemma.reset() }
         bumpPrefs()
     }
 
@@ -336,36 +347,12 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
         bumpPrefs()
     }
 
-    fun createEncryptedBackup(password: String): String {
+    fun createEncryptedArchive(password: String): String {
         return BackupExporter.createEncryptedBackup(
             notifications = notifications.value,
             preferences = graph.preferences,
             password = password
         )
-    }
-
-    fun restoreBackup(encryptedText: String, password: String): Result<Int> {
-        val result = BackupExporter.decryptBackup(encryptedText, password)
-        return result.map { json ->
-            require(json.optInt("version", -1) == 1) { "Unsupported backup version" }
-
-            var restoredVipRules = 0
-            val vipRules = json.optJSONArray("vip_rules")
-            if (vipRules != null) {
-                for (i in 0 until vipRules.length()) {
-                    val token = vipRules.getString(i)
-                    val pkg = token.substringBefore('|')
-                    val sender = token.substringAfter('|').takeIf { it.isNotBlank() }
-                    graph.preferences.setVip(pkg, sender, true)
-                    restoredVipRules += 1
-                }
-            }
-            bumpPrefs()
-            refreshStorageStats()
-
-            // Notification records are not restored by the current v1 archive format.
-            restoredVipRules
-        }
     }
 
     fun refreshObservedApps() = viewModelScope.launch {

@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 class NotificationStore(context: Context) {
@@ -24,8 +26,19 @@ class NotificationStore(context: Context) {
     private val _expenses = MutableStateFlow<List<ExpenseTransaction>>(emptyList())
     val expenses: StateFlow<List<ExpenseTransaction>> = _expenses.asStateFlow()
 
+    private val _initialLoadComplete = MutableStateFlow(false)
+    val initialLoadComplete: StateFlow<Boolean> = _initialLoadComplete.asStateFlow()
+
+    private val mutationMutex = Mutex()
+
     init {
-        scope.launch { refresh() }
+        scope.launch {
+            try {
+                mutationMutex.withLock { refreshFromDb() }
+            } finally {
+                _initialLoadComplete.value = true
+            }
+        }
     }
 
     suspend fun upsertIncoming(
@@ -34,90 +47,103 @@ class NotificationStore(context: Context) {
         isVip: Boolean,
         expenseTrackingEnabled: Boolean
     ): Long = withContext(Dispatchers.IO) {
-        val db = helper.writableDatabase
-        val existing = findByKey(db, incoming.key)
-        val now = System.currentTimeMillis()
-        val values = ContentValues().apply {
-            put("notification_key", incoming.key)
-            put("package_name", incoming.packageName)
-            put("app_name", incoming.appName)
-            putNullable("title", incoming.title)
-            putNullable("body", incoming.body)
-            putNullable("sender", incoming.sender)
-            put("posted_at", existing?.postedAt ?: incoming.postedAt)
-            put("updated_at", now)
-            putNull("removed_at")
-            put("is_active", 1)
-            put("category", if (existing?.categoryOverridden == true) existing.category.name else classification.category.name)
-            put("priority", if (existing?.priorityOverridden == true) existing.priority.name else classification.priority.name)
-            put("confidence", classification.confidence)
-            put("category_overridden", if (existing?.categoryOverridden == true) 1 else 0)
-            put("priority_overridden", if (existing?.priorityOverridden == true) 1 else 0)
-            put("state", existing?.state?.name ?: NotificationState.ACTIVE.name)
-            if (existing?.remindAt != null) put("remind_at", existing.remindAt) else putNull("remind_at")
-            put("pinned", if (existing?.pinned == true) 1 else 0)
-            put("is_vip", if (isVip) 1 else 0)
-            put("read", if (existing?.read == true) 1 else 0)
-            classification.amountHint?.let { put("amount_hint", it) } ?: existing?.amountHint?.let { put("amount_hint", it) }
-            put("is_deleted_by_sender", if (existing?.isDeletedBySender == true) 1 else 0)
-        }
-
-        val id = if (existing == null) {
-            db.insertOrThrow(TABLE, null, values)
-        } else {
-            db.update(TABLE, values, "id=?", arrayOf(existing.id.toString()))
-            existing.id
-        }
-
-        if (expenseTrackingEnabled) {
-            val parsedExpense = ExpenseParser.parse(
-                title = incoming.title,
-                body = incoming.body,
-                packageName = incoming.packageName,
-                appName = incoming.appName,
-                notificationId = id,
-                timestamp = incoming.postedAt
-            )
-
-            if (parsedExpense != null) {
-                val expValues = ContentValues().apply {
-                    put("notification_id", id)
-                    put("amount", parsedExpense.amount)
-                    put("transaction_type", parsedExpense.transactionType.name)
-                    putNullable("merchant_or_party", parsedExpense.merchantOrParty)
-                    putNullable("account_ref", parsedExpense.accountRef)
-                    if (parsedExpense.balanceAfter != null) put("balance_after", parsedExpense.balanceAfter) else putNull("balance_after")
-                    put("expense_category", parsedExpense.expenseCategory.name)
-                    put("timestamp", incoming.postedAt)
+        mutationMutex.withLock {
+            val db = helper.writableDatabase
+            db.beginTransaction()
+            val id = try {
+                val existing = findByKey(db, incoming.key)
+                val now = System.currentTimeMillis()
+                val values = ContentValues().apply {
+                    put("notification_key", incoming.key)
+                    put("package_name", incoming.packageName)
+                    put("app_name", incoming.appName)
+                    putNullable("title", incoming.title)
+                    putNullable("body", incoming.body)
+                    putNullable("sender", incoming.sender)
+                    put("posted_at", existing?.postedAt ?: incoming.postedAt)
+                    put("updated_at", now)
+                    putNull("removed_at")
+                    put("is_active", 1)
+                    put("category", if (existing?.categoryOverridden == true) existing.category.name else classification.category.name)
+                    put("priority", if (existing?.priorityOverridden == true) existing.priority.name else classification.priority.name)
+                    put("confidence", classification.confidence)
+                    put("category_overridden", if (existing?.categoryOverridden == true) 1 else 0)
+                    put("priority_overridden", if (existing?.priorityOverridden == true) 1 else 0)
+                    put("state", existing?.state?.name ?: NotificationState.ACTIVE.name)
+                    if (existing?.remindAt != null) put("remind_at", existing.remindAt) else putNull("remind_at")
+                    put("pinned", if (existing?.pinned == true) 1 else 0)
+                    put("is_vip", if (isVip) 1 else 0)
+                    put("read", if (existing?.read == true) 1 else 0)
+                    classification.amountHint?.let { put("amount_hint", it) } ?: existing?.amountHint?.let { put("amount_hint", it) }
+                    put("is_deleted_by_sender", if (existing?.isDeletedBySender == true) 1 else 0)
                 }
-                db.insertWithOnConflict(TABLE_EXPENSES, null, expValues, SQLiteDatabase.CONFLICT_REPLACE)
-            }
-        }
 
-        refresh()
-        id
+                val rowId = if (existing == null) {
+                    db.insertOrThrow(TABLE, null, values)
+                } else {
+                    db.update(TABLE, values, "id=?", arrayOf(existing.id.toString()))
+                    existing.id
+                }
+
+                if (expenseTrackingEnabled) {
+                    val parsedExpense = ExpenseParser.parse(
+                        title = incoming.title,
+                        body = incoming.body,
+                        packageName = incoming.packageName,
+                        appName = incoming.appName,
+                        notificationId = rowId,
+                        timestamp = incoming.postedAt
+                    )
+                    if (parsedExpense != null) {
+                        val expValues = ContentValues().apply {
+                            put("notification_id", rowId)
+                            put("amount", parsedExpense.amount)
+                            put("transaction_type", parsedExpense.transactionType.name)
+                            putNullable("merchant_or_party", parsedExpense.merchantOrParty)
+                            putNullable("account_ref", parsedExpense.accountRef)
+                            if (parsedExpense.balanceAfter != null) put("balance_after", parsedExpense.balanceAfter) else putNull("balance_after")
+                            put("expense_category", parsedExpense.expenseCategory.name)
+                            put("timestamp", incoming.postedAt)
+                        }
+                        db.insertWithOnConflict(TABLE_EXPENSES, null, expValues, SQLiteDatabase.CONFLICT_REPLACE)
+                    }
+                }
+                db.setTransactionSuccessful()
+                rowId
+            } finally {
+                db.endTransaction()
+            }
+            updateCacheFromDb(id)
+            id
+        }
     }
 
     suspend fun updateClassification(id: Long, classification: ClassificationResult) = withContext(Dispatchers.IO) {
-        val existing = getInternal(helper.readableDatabase, id) ?: return@withContext
-        val values = ContentValues().apply {
-            if (!existing.categoryOverridden) put("category", classification.category.name)
-            if (!existing.priorityOverridden) put("priority", classification.priority.name)
-            put("confidence", classification.confidence)
-            classification.amountHint?.let { put("amount_hint", it) }
+        mutationMutex.withLock {
+            val existing = getInternal(helper.readableDatabase, id) ?: return@withLock
+            val values = ContentValues().apply {
+                if (!existing.categoryOverridden) put("category", classification.category.name)
+                if (!existing.priorityOverridden) put("priority", classification.priority.name)
+                put("confidence", classification.confidence)
+                classification.amountHint?.let { put("amount_hint", it) }
+            }
+            helper.writableDatabase.update(TABLE, values, "id=?", arrayOf(id.toString()))
+            updateCacheFromDb(id)
         }
-        helper.writableDatabase.update(TABLE, values, "id=?", arrayOf(id.toString()))
-        refresh()
     }
 
     suspend fun markRemoved(notificationKey: String) = withContext(Dispatchers.IO) {
-        val values = ContentValues().apply {
-            put("is_active", 0)
-            put("removed_at", System.currentTimeMillis())
-            put("updated_at", System.currentTimeMillis())
+        mutationMutex.withLock {
+            val db = helper.writableDatabase
+            val existing = findByKey(db, notificationKey) ?: return@withLock
+            val values = ContentValues().apply {
+                put("is_active", 0)
+                put("removed_at", System.currentTimeMillis())
+                put("updated_at", System.currentTimeMillis())
+            }
+            db.update(TABLE, values, "id=?", arrayOf(existing.id.toString()))
+            updateCacheFromDb(existing.id)
         }
-        helper.writableDatabase.update(TABLE, values, "notification_key=?", arrayOf(notificationKey))
-        refresh()
     }
 
     suspend fun setState(id: Long, state: NotificationState) = update(id) {
@@ -150,15 +176,21 @@ class NotificationStore(context: Context) {
     suspend fun setPinned(id: Long, pinned: Boolean) = update(id) { put("pinned", if (pinned) 1 else 0) }
 
     suspend fun delete(id: Long) = withContext(Dispatchers.IO) {
-        helper.writableDatabase.delete(TABLE, "id=?", arrayOf(id.toString()))
-        helper.writableDatabase.delete(TABLE_EXPENSES, "notification_id=?", arrayOf(id.toString()))
-        refresh()
+        mutationMutex.withLock {
+            helper.writableDatabase.delete(TABLE_EXPENSES, "notification_id=?", arrayOf(id.toString()))
+            helper.writableDatabase.delete(TABLE, "id=?", arrayOf(id.toString()))
+            _items.value = _items.value.filterNot { it.id == id }
+            _expenses.value = _expenses.value.filterNot { it.notificationId == id }
+        }
     }
 
     suspend fun clearAll() = withContext(Dispatchers.IO) {
-        helper.writableDatabase.delete(TABLE, null, null)
-        helper.writableDatabase.delete(TABLE_EXPENSES, null, null)
-        refresh()
+        mutationMutex.withLock {
+            helper.writableDatabase.delete(TABLE_EXPENSES, null, null)
+            helper.writableDatabase.delete(TABLE, null, null)
+            _items.value = emptyList()
+            _expenses.value = emptyList()
+        }
     }
 
     suspend fun get(id: Long): NotificationItem? = withContext(Dispatchers.IO) {
@@ -176,43 +208,57 @@ class NotificationStore(context: Context) {
         }
     }
 
-    suspend fun itemsSince(timestamp: Long): List<NotificationItem> = withContext(Dispatchers.IO) {
-        query("posted_at>=?", arrayOf(timestamp.toString()), "posted_at DESC", limit = 1000)
+    suspend fun itemsSince(timestamp: Long): List<NotificationItem> =
+        itemsBetween(timestamp, System.currentTimeMillis())
+
+    suspend fun itemsBetween(
+        sinceExclusive: Long,
+        untilInclusive: Long,
+        pageSize: Int = 500
+    ): List<NotificationItem> = withContext(Dispatchers.IO) {
+        require(pageSize > 0) { "pageSize must be positive" }
+        val db = helper.readableDatabase
+        val result = mutableListOf<NotificationItem>()
+        var beforePostedAt: Long? = null
+        var beforeId: Long? = null
+        while (true) {
+            val selection: String
+            val args: Array<String>
+            if (beforePostedAt == null || beforeId == null) {
+                selection = "posted_at>? AND posted_at<=?"
+                args = arrayOf(sinceExclusive.toString(), untilInclusive.toString())
+            } else {
+                selection = "posted_at>? AND posted_at<=? AND (posted_at<? OR (posted_at=? AND id<?))"
+                args = arrayOf(sinceExclusive.toString(), untilInclusive.toString(), beforePostedAt.toString(), beforePostedAt.toString(), beforeId.toString())
+            }
+            val page = db.query(TABLE, null, selection, args, null, null, "posted_at DESC, id DESC", pageSize.toString()).use { cursor ->
+                buildList { while (cursor.moveToNext()) add(cursor.toItem(null)) }
+            }
+            if (page.isEmpty()) break
+            result += page
+            val last = page.last()
+            beforePostedAt = last.postedAt
+            beforeId = last.id
+            if (page.size < pageSize) break
+        }
+        result
     }
 
     suspend fun cleanup(retentionDays: Int): Int = withContext(Dispatchers.IO) {
-        val now = System.currentTimeMillis()
-        val retentionCutoff = now - retentionDays * 86_400_000L
-        var count = helper.writableDatabase.delete(
-            TABLE,
-            "posted_at<? AND pinned=0 AND state NOT IN (?,?)",
-            arrayOf(retentionCutoff.toString(), NotificationState.LATER.name, NotificationState.ACTIVE.name)
-        )
-
-        val otpCutoff = now - 2 * 86_400_000L
-        count += helper.writableDatabase.delete(
-            TABLE,
-            "posted_at<? AND pinned=0 AND remind_at IS NULL AND category=?",
-            arrayOf(otpCutoff.toString(), NotificationCategory.OTP.name)
-        )
-        val lowValueCutoff = now - minOf(retentionDays, 14) * 86_400_000L
-        count += helper.writableDatabase.delete(
-            TABLE,
-            "posted_at<? AND pinned=0 AND remind_at IS NULL AND category IN (?,?)",
-            arrayOf(lowValueCutoff.toString(), NotificationCategory.PROMOTION.name, NotificationCategory.SPAM.name)
-        )
-        val deliveryCutoff = now - minOf(retentionDays, 21) * 86_400_000L
-        count += helper.writableDatabase.delete(
-            TABLE,
-            "posted_at<? AND pinned=0 AND remind_at IS NULL AND category=? AND is_active=0",
-            arrayOf(deliveryCutoff.toString(), NotificationCategory.DELIVERY.name)
-        )
-
-        // Clean orphaned expenses
-        helper.writableDatabase.execSQL("DELETE FROM $TABLE_EXPENSES WHERE notification_id NOT IN (SELECT id FROM $TABLE)")
-
-        refresh()
-        count
+        mutationMutex.withLock {
+            val now = System.currentTimeMillis()
+            val retentionCutoff = now - retentionDays * 86_400_000L
+            var count = helper.writableDatabase.delete(TABLE, "posted_at<? AND pinned=0 AND remind_at IS NULL AND is_active=0", arrayOf(retentionCutoff.toString()))
+            val otpCutoff = now - 2 * 86_400_000L
+            count += helper.writableDatabase.delete(TABLE, "posted_at<? AND pinned=0 AND remind_at IS NULL AND is_active=0 AND category=?", arrayOf(otpCutoff.toString(), NotificationCategory.OTP.name))
+            val lowValueCutoff = now - minOf(retentionDays, 14) * 86_400_000L
+            count += helper.writableDatabase.delete(TABLE, "posted_at<? AND pinned=0 AND remind_at IS NULL AND is_active=0 AND category IN (?,?)", arrayOf(lowValueCutoff.toString(), NotificationCategory.PROMOTION.name, NotificationCategory.SPAM.name))
+            val deliveryCutoff = now - minOf(retentionDays, 21) * 86_400_000L
+            count += helper.writableDatabase.delete(TABLE, "posted_at<? AND pinned=0 AND remind_at IS NULL AND category=? AND is_active=0", arrayOf(deliveryCutoff.toString(), NotificationCategory.DELIVERY.name))
+            helper.writableDatabase.execSQL("DELETE FROM $TABLE_EXPENSES WHERE notification_id NOT IN (SELECT id FROM $TABLE)")
+            refreshFromDb()
+            count
+        }
     }
 
     suspend fun storageStats(): Pair<Int, Long> = withContext(Dispatchers.IO) {
@@ -256,13 +302,14 @@ class NotificationStore(context: Context) {
     }
 
     suspend fun markDeletedBySender(id: Long): NotificationItem? = withContext(Dispatchers.IO) {
-        val values = ContentValues().apply {
-            put("is_deleted_by_sender", 1)
-            put("updated_at", System.currentTimeMillis())
+        mutationMutex.withLock {
+            val values = ContentValues().apply {
+                put("is_deleted_by_sender", 1)
+                put("updated_at", System.currentTimeMillis())
+            }
+            helper.writableDatabase.update(TABLE, values, "id=?", arrayOf(id.toString()))
+            updateCacheFromDb(id)
         }
-        helper.writableDatabase.update(TABLE, values, "id=?", arrayOf(id.toString()))
-        refresh()
-        getInternal(helper.readableDatabase, id)
     }
 
     suspend fun countDeletedMessages(): Int = withContext(Dispatchers.IO) {
@@ -291,23 +338,23 @@ class NotificationStore(context: Context) {
     }
 
     suspend fun deleteUnwantedOldMessages(days: Int = 15): Int = withContext(Dispatchers.IO) {
-        val cutoff = System.currentTimeMillis() - days * 86_400_000L
-        val count = helper.writableDatabase.delete(
-            TABLE,
-            """
-            posted_at < ?
-              AND pinned = 0
-              AND is_vip = 0
-              AND remind_at IS NULL
-              AND category IN ('${NotificationCategory.PROMOTION.name}', '${NotificationCategory.SPAM.name}')
-            """.trimIndent(),
-            arrayOf(cutoff.toString())
-        )
-        if (count > 0) {
-            helper.writableDatabase.execSQL("DELETE FROM $TABLE_EXPENSES WHERE notification_id NOT IN (SELECT id FROM $TABLE)")
+        mutationMutex.withLock {
+            val cutoff = System.currentTimeMillis() - days * 86_400_000L
+            val count = helper.writableDatabase.delete(
+                TABLE,
+                """
+                posted_at < ?
+                  AND pinned = 0
+                  AND is_vip = 0
+                  AND remind_at IS NULL
+                  AND category IN ('${NotificationCategory.PROMOTION.name}', '${NotificationCategory.SPAM.name}')
+                """.trimIndent(),
+                arrayOf(cutoff.toString())
+            )
+            if (count > 0) helper.writableDatabase.execSQL("DELETE FROM $TABLE_EXPENSES WHERE notification_id NOT IN (SELECT id FROM $TABLE)")
+            refreshFromDb()
+            count
         }
-        refresh()
-        count
     }
 
     fun getExpenseSummary(since: Long = 0L, until: Long = Long.MAX_VALUE): ExpenseSummary {
@@ -342,12 +389,14 @@ class NotificationStore(context: Context) {
     }
 
     private suspend fun update(id: Long, fill: ContentValues.() -> Unit) = withContext(Dispatchers.IO) {
-        val values = ContentValues().apply {
-            fill()
-            put("updated_at", System.currentTimeMillis())
+        mutationMutex.withLock {
+            val values = ContentValues().apply {
+                fill()
+                put("updated_at", System.currentTimeMillis())
+            }
+            helper.writableDatabase.update(TABLE, values, "id=?", arrayOf(id.toString()))
+            updateCacheFromDb(id)
         }
-        helper.writableDatabase.update(TABLE, values, "id=?", arrayOf(id.toString()))
-        refresh()
     }
 
     private fun findByKey(db: SQLiteDatabase, key: String): NotificationItem? {
@@ -399,10 +448,30 @@ class NotificationStore(context: Context) {
         }
     }
 
-    private suspend fun refresh() {
+    private fun refreshFromDb() {
         val expensesList = queryExpenses()
         _expenses.value = expensesList
         _items.value = query()
+    }
+
+    private fun updateCacheFromDb(id: Long): NotificationItem? {
+        val item = getInternal(helper.readableDatabase, id) ?: run {
+            _items.value = _items.value.filterNot { it.id == id }
+            _expenses.value = _expenses.value.filterNot { it.notificationId == id }
+            return null
+        }
+        _items.value = (_items.value.filterNot { it.id == id } + item)
+            .sortedWith(compareByDescending<NotificationItem> { it.pinned }.thenByDescending { it.postedAt })
+            .take(CACHE_LIMIT)
+        val expense = item.expenseTransaction
+        _expenses.value = if (expense == null) {
+            _expenses.value.filterNot { it.notificationId == id }
+        } else {
+            (_expenses.value.filterNot { it.notificationId == id } + expense)
+                .sortedByDescending { it.timestamp }
+                .take(CACHE_LIMIT)
+        }
+        return item
     }
 
     private fun Cursor.toExpense() = ExpenseTransaction(
@@ -537,6 +606,7 @@ class NotificationStore(context: Context) {
         const val DB_VERSION = 3
         const val TABLE = "notifications"
         const val TABLE_EXPENSES = "expense_transactions"
+        const val CACHE_LIMIT = 5000
     }
 }
 

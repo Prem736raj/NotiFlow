@@ -1,11 +1,9 @@
 package com.premraj.notiflow.work
 
-import android.Manifest
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
-import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.work.CoroutineWorker
@@ -18,6 +16,7 @@ import com.premraj.notiflow.data.NotificationPriority
 import com.premraj.notiflow.data.NotificationState
 import com.premraj.notiflow.intelligence.LocalIntelligence
 import com.premraj.notiflow.util.NotificationChannels
+import com.premraj.notiflow.util.NotificationPosting
 
 class DigestWorker(
     appContext: Context,
@@ -29,15 +28,20 @@ class DigestWorker(
 
         val now = System.currentTimeMillis()
         val since = graph.preferences.lastDigestAt.takeIf { it > 0L } ?: now - 24 * 60 * 60_000L
-        val items = graph.store.itemsSince(since).filter {
+        val items = graph.store.itemsBetween(since, now).filter {
             it.state == NotificationState.ACTIVE && !it.pinned
         }
-        graph.preferences.lastDigestAt = now
-        if (items.isEmpty()) return Result.success()
+        if (items.isEmpty()) {
+            graph.preferences.lastDigestAt = now
+            return Result.success()
+        }
 
         val important = items.filter { LocalIntelligence.effectivePriority(it, now) == NotificationPriority.HIGH }
         val lowValue = items.filter { LocalIntelligence.effectivePriority(it, now) != NotificationPriority.HIGH }
-        if (lowValue.isEmpty()) return Result.success()
+        if (lowValue.isEmpty()) {
+            graph.preferences.lastDigestAt = now
+            return Result.success()
+        }
 
         val counts = lowValue.groupingBy { it.category }.eachCount()
         val structured = counts.entries
@@ -87,10 +91,22 @@ class DigestWorker(
             .setPublicVersion(publicVersion)
             .build()
 
-        if (ActivityCompat.checkSelfPermission(applicationContext, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
-            NotificationManagerCompat.from(applicationContext).notify(7001, notification)
+        if (!NotificationPosting.canPost(applicationContext, NotificationChannels.DIGESTS)) {
+            return Result.success()
         }
-        return Result.success()
+
+        return runCatching {
+            postNotification(7001, notification)
+            graph.preferences.lastDigestAt = now
+        }.fold(
+            onSuccess = { Result.success() },
+            onFailure = { Result.retry() }
+        )
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun postNotification(id: Int, notification: android.app.Notification) {
+        NotificationManagerCompat.from(applicationContext).notify(id, notification)
     }
 
     private fun shortLabel(category: NotificationCategory): String = when (category) {

@@ -22,7 +22,7 @@ NotiFlow is an Android notification inbox focused on local-first notification hi
 
 - **Focus profiles:** manual and scheduled status are implemented, but focus-based notification suppression is intentionally not enforced until its policy is device-tested.
 - **Local AI:** MediaPipe `tasks-genai:0.10.27` integration remains isolated behind `GemmaClassifier`. Automatic network model download is disabled. The current app has no production-ready verified model-import/acquisition flow, so rules-only mode is the safe default.
-- **Restore:** the current v1 encrypted archive can decrypt and restore VIP rules, but does not restore notification history. UI does not claim a completed notification restore.
+- **Encrypted archive export:** the current v1 export is password-protected and intended for data portability/reference. There is no full notification-history restore path or restore UI yet.
 - **Anti-revoke:** NotiFlow preserves captured notification history after a source notification disappears; it does **not** claim to prove a sender used “Delete for everyone.”
 - **Voice reader:** incoming notifications are wired to the TTS policy engine, but real routing/OEM/device behavior still requires physical-device verification.
 

@@ -133,15 +133,15 @@ fun SettingsScreen(
                 backupDialog = false
                 backupPassphrase = ""
             },
-            title = { Text("Protect encrypted backup") },
+            title = { Text("Protect encrypted archive") },
             text = {
                 Column {
-                    Text("Create a passphrase with at least 12 characters. You will need the same passphrase to decrypt this backup.")
+                    Text("Create a passphrase with at least 12 characters. You will need the same passphrase to decrypt this exported archive.")
                     Spacer(Modifier.height(10.dp))
                     OutlinedTextField(
                         value = backupPassphrase,
                         onValueChange = { backupPassphrase = it },
-                        label = { Text("Backup passphrase") },
+                        label = { Text("Archive passphrase") },
                         visualTransformation = PasswordVisualTransformation(),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
@@ -152,17 +152,17 @@ fun SettingsScreen(
                 TextButton(
                     enabled = backupPassphrase.length >= 12,
                     onClick = {
-                        val backupText = viewModel.createEncryptedBackup(backupPassphrase)
+                        val backupText = viewModel.createEncryptedArchive(backupPassphrase)
                         backupPassphrase = ""
                         backupDialog = false
                         val sendIntent = Intent(Intent.ACTION_SEND).apply {
                             type = "text/plain"
-                            putExtra(Intent.EXTRA_SUBJECT, "NotiFlow Encrypted Backup")
+                            putExtra(Intent.EXTRA_SUBJECT, "NotiFlow Encrypted Archive")
                             putExtra(Intent.EXTRA_TEXT, backupText)
                         }
-                        context.startActivity(Intent.createChooser(sendIntent, "Export Encrypted Backup"))
+                        context.startActivity(Intent.createChooser(sendIntent, "Export Encrypted Archive"))
                     }
-                ) { Text("Create backup") }
+                ) { Text("Create archive") }
             },
             dismissButton = {
                 TextButton(
@@ -657,7 +657,7 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("Export password-protected backup", fontWeight = FontWeight.Bold)
+                        Text("Export password-protected archive", fontWeight = FontWeight.Bold)
                     }
 
                     Spacer(Modifier.height(10.dp))

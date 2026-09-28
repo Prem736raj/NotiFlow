@@ -48,6 +48,7 @@ import com.premraj.notiflow.data.NotificationCategory
 import com.premraj.notiflow.data.NotificationItem
 import com.premraj.notiflow.data.NotificationPriority
 import com.premraj.notiflow.data.NotificationState
+import com.premraj.notiflow.intelligence.LocalIntelligence
 import com.premraj.notiflow.intelligence.SearchIntent
 import com.premraj.notiflow.intelligence.SearchInterpreter
 import kotlin.math.abs
@@ -293,10 +294,10 @@ private fun matchesSearch(
     if (intent.from != null && item.postedAt < intent.from) return false
     if (intent.until != null && item.postedAt >= intent.until) return false
     if (intent.category != null && item.category != intent.category) return false
-    if (intent.priority != null && item.priority != intent.priority) return false
+    if (intent.priority != null && LocalIntelligence.effectivePriority(item) != intent.priority) return false
     if (intent.state != null && item.state != intent.state) return false
     if (manualCategory != null && item.category != manualCategory) return false
-    if (manualPriority != null && item.priority != manualPriority) return false
+    if (manualPriority != null && LocalIntelligence.effectivePriority(item) != manualPriority) return false
     if (manualState != null && item.state != manualState) return false
     if (manualApp != null && item.packageName != manualApp) return false
     if (intent.amount != null) {

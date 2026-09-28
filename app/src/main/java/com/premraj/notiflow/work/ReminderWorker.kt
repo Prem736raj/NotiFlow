@@ -1,11 +1,9 @@
 package com.premraj.notiflow.work
 
-import android.Manifest
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
-import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.work.CoroutineWorker
@@ -67,11 +65,23 @@ class ReminderWorker(
             .setPublicVersion(publicVersion)
             .build()
 
-        if (ActivityCompat.checkSelfPermission(applicationContext, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
-            val notificationId = NotificationPosting.safeNotificationId(id, 10_000)
-            NotificationManagerCompat.from(applicationContext).notify(notificationId, notification)
+        if (!NotificationPosting.canPost(applicationContext, NotificationChannels.REMINDERS)) {
+            return Result.success()
         }
-        return Result.success()
+
+        val notificationId = NotificationPosting.safeNotificationId(id, 10_000)
+        return runCatching {
+            postNotification(notificationId, notification)
+            applicationContext.appGraph.store.setState(id, NotificationState.ACTIVE)
+        }.fold(
+            onSuccess = { Result.success() },
+            onFailure = { Result.retry() }
+        )
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun postNotification(id: Int, notification: android.app.Notification) {
+        NotificationManagerCompat.from(applicationContext).notify(id, notification)
     }
 
     companion object {

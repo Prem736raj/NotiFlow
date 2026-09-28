@@ -153,15 +153,7 @@ class NotiFlowNotificationListener : NotificationListenerService() {
         )
 
         val vip = graph.preferences.isVip(sbn.packageName, sender)
-
-        val initial = if (vip) {
-            personalizedFast.copy(
-                priority = NotificationPriority.HIGH,
-                confidence = maxOf(personalizedFast.confidence, 0.95f)
-            )
-        } else {
-            personalizedFast
-        }
+        val initial = personalizedFast
 
         val incoming = IncomingNotification(
             key = sbn.key,
@@ -188,12 +180,24 @@ class NotiFlowNotificationListener : NotificationListenerService() {
             handleAutoCopyOtp(otpCode, appName, id)
         }
 
-        val refined = graph.gemma.refine(
-            appName = appName,
-            title = title,
-            body = body,
-            fallback = initial
-        )
+        val refined = if (
+            LocalIntelligence.shouldRefineWithAi(
+                packageName = sbn.packageName,
+                title = title,
+                body = body,
+                sender = sender,
+                fallback = initial
+            )
+        ) {
+            graph.gemma.refine(
+                appName = appName,
+                title = title,
+                body = body,
+                fallback = initial
+            )
+        } else {
+            null
+        }
 
         if (refined != null) {
             val personalized = applyPersonalization(
@@ -202,14 +206,7 @@ class NotiFlowNotificationListener : NotificationListenerService() {
                 sender
             )
 
-            graph.store.updateClassification(
-                id,
-                if (vip) {
-                    personalized.copy(priority = NotificationPriority.HIGH)
-                } else {
-                    personalized
-                }
-            )
+            graph.store.updateClassification(id, personalized)
         }
 
         val stored = graph.store.get(id) ?: return

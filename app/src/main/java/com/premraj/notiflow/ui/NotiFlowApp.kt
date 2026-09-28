@@ -33,6 +33,7 @@ fun NotiFlowApp(
     val context = LocalContext.current
     val notifications by viewModel.notifications.collectAsStateWithLifecycle()
     val expenses by viewModel.expenseTransactions.collectAsStateWithLifecycle()
+    val initialLoadComplete by viewModel.initialLoadComplete.collectAsStateWithLifecycle()
     val prefVersion by viewModel.preferencesVersion.collectAsStateWithLifecycle()
     var screen by rememberSaveable { mutableStateOf(AppScreen.HOME.name) }
     var section by rememberSaveable { mutableStateOf(HomeSection.NOW.name) }
@@ -42,9 +43,9 @@ fun NotiFlowApp(
     @Suppress("UNUSED_VARIABLE") val recomposePrefs = prefVersion
     val onboardingComplete = viewModel.preferences.onboardingComplete
 
-    LaunchedEffect(requestedNotificationId, requestedDigest, notifications) {
+    LaunchedEffect(requestedNotificationId, requestedDigest, notifications, initialLoadComplete) {
         when {
-            requestedNotificationId != null -> {
+            requestedNotificationId != null && initialLoadComplete -> {
                 if (notifications.any { it.id == requestedNotificationId }) {
                     detailId = requestedNotificationId
                     screen = AppScreen.DETAIL.name
@@ -52,6 +53,7 @@ fun NotiFlowApp(
                 }
                 onNavigationRequestConsumed()
             }
+            requestedNotificationId != null -> Unit
             requestedDigest -> {
                 section = HomeSection.DIGEST.name
                 screen = AppScreen.HOME.name

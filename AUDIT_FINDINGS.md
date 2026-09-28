@@ -49,7 +49,7 @@ Local verification executed with Android SDK 37 (API 36.1 extension), Java 17, a
 | `./gradlew.bat testDebugUnitTest` | ✅ PASS | 58 tests passed (0 failed, 0 skipped) |
 | `./gradlew.bat lintDebug` | ✅ PASS | BUILD SUCCESSFUL in 7m 35s (0 errors, SARIF/HTML generated) |
 | `./gradlew.bat assembleDebug` | ✅ PASS | BUILD SUCCESSFUL in 2m 24s (debug APK assembled) |
-| GitHub Actions | ⏳ Pending push | SDK bootstrap workflow repaired, pending remote CI run on push |
+| GitHub Actions | ✅ PASS | Run 36440635850: verify job passed in 5m 3s (test, lint, assemble) |
 
 All local compile, lint, test, and assembly blockers are resolved.
 
@@ -301,7 +301,7 @@ OEM coverage should include Pixel/AOSP, Samsung, and Xiaomi/HyperOS where practi
 
 ## Release gates
 
-- [ ] GitHub Actions: `testDebugUnitTest lintDebug assembleDebug` passes (workflow updated, pending remote run on push).
+- [x] GitHub Actions: `testDebugUnitTest lintDebug assembleDebug` passes (Run 36440635850).
 - [x] `./gradlew.bat testDebugUnitTest` passes (58 tests pass).
 - [x] `./gradlew.bat lintDebug` passes (0 errors).
 - [x] `./gradlew.bat assembleDebug` passes (debug APK produced).

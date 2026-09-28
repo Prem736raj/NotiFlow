@@ -19,7 +19,7 @@ This file is a status index, not proof. Runtime/build proof must come from CI, t
 | 13 | 🟡 Partial | rule-based natural-language interpretation exists; do not describe it as semantic vector search |
 | 14 | ⚠️ Guarded | retention/cleanup exists; destructive broad “%off%” deletion was removed |
 | 15 | 🟡 Partial | privacy controls improved; DB-at-rest threat model, complete restore, and full data-deletion semantics remain |
-| 16 | ✅ Verified locally | local testDebugUnitTest (58 passed), lintDebug (0 errors), and assembleDebug pass; remote CI workflow configured |
+| 16 | ✅ CI passed | GitHub Actions run 36440635850 verified testDebugUnitTest, lintDebug, assembleDebug in 5m 3s |
 
 ## Status legend
 

@@ -28,7 +28,7 @@ object ExpenseParser {
 
     private val merchantToRegex = Regex("""(?i)(?:paid\s+to|payment\s+to|transfer\s+to|sent\s+to|paid\s+at)\s+([A-Za-z0-9 .'&_-]{2,35})(?:\s+using|\s+via|\s+on|\s+for|\s+ref|\.|,|$)""")
     private val merchantFromRegex = Regex("""(?i)(?:received\s+from|from\s+vpa|received\s+via)\s+([A-Za-z0-9 .'&_-]{2,35})(?:\s+using|\s+via|\s+on|\s+for|\s+ref|\.|,|$)""")
-    private val merchantAtRegex = Regex("""(?i)(?:\bat|info:\s*|vpa\s+)([A-Za-z0-9 .'&_-]{2,30})""")
+    private val merchantAtRegex = Regex("""(?i)(?:\bat\s+|info:\s*|vpa\s+)([A-Za-z0-9 '&_-]{2,30}?)(?:\s+using|\s+via|\s+on|\s+for|\s+ref|\.|,|$)""")
 
     fun parse(
         title: String?,
@@ -59,6 +59,17 @@ object ExpenseParser {
 
         // Negative check: avoid OTP/recharge promotion confusion if not actually a debit/credit
         if (lowerText.contains("otp") && !lowerText.contains("debited") && !lowerText.contains("credited")) {
+            return null
+        }
+
+        // Negative check: avoid payment due alerts/reminders being treated as completed transactions
+        if ((lowerText.contains("is due") || lowerText.contains("due on") || lowerText.contains("due by") || lowerText.contains("payment due")) &&
+            !lowerText.contains("debited") &&
+            !lowerText.contains("paid successfully") &&
+            !lowerText.contains("successful payment") &&
+            !lowerText.contains("deducted") &&
+            !lowerText.contains("spent")
+        ) {
             return null
         }
 

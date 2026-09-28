@@ -1,11 +1,14 @@
 package com.premraj.notiflow.data
 
 import android.content.Context
+import android.content.SharedPreferences
 import org.json.JSONArray
 import org.json.JSONObject
 
-class UserPreferences(context: Context) {
-    private val prefs = context.getSharedPreferences("notiflow_preferences", Context.MODE_PRIVATE)
+class UserPreferences internal constructor(private val prefs: SharedPreferences) {
+    constructor(context: Context) : this(
+        context.getSharedPreferences("notiflow_preferences", Context.MODE_PRIVATE)
+    )
 
     var onboardingComplete: Boolean
         get() = prefs.getBoolean(KEY_ONBOARDING, false)

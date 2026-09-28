@@ -107,4 +107,25 @@ class VoiceReaderTest {
         val announcement = VoiceReaderPolicy.buildAnnouncement(item, VoiceReadingDetail.FULL_MESSAGE)
         assertEquals("App from Sender: " + "A".repeat(120), announcement)
     }
+
+    @Test
+    fun testIsOtpByCategoryRejectsEvenWithoutParsedDigits() {
+        val item = createItem(appName = "Bank", sender = "Auth", title = "Verification", body = "Your code has expired.")
+            .copy(category = NotificationCategory.OTP)
+        org.junit.Assert.assertTrue(VoiceReaderPolicy.isOtp(item))
+    }
+
+    @Test
+    fun testIsOtpByExtractedDigitsRejectsEvenIfCategoryIsMessage() {
+        val item = createItem(appName = "SMS", sender = "Service", title = "Alert", body = "Your login code is 849201")
+            .copy(category = NotificationCategory.MESSAGE)
+        org.junit.Assert.assertTrue(VoiceReaderPolicy.isOtp(item))
+    }
+
+    @Test
+    fun testIsNotOtpForNormalMessage() {
+        val item = createItem(appName = "Chat", sender = "Friend", title = "Hi", body = "How are you doing today?")
+            .copy(category = NotificationCategory.MESSAGE)
+        org.junit.Assert.assertFalse(VoiceReaderPolicy.isOtp(item))
+    }
 }

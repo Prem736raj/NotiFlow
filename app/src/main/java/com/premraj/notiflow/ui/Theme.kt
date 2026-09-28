@@ -1,6 +1,5 @@
 package com.premraj.notiflow.ui
 
-import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -11,6 +10,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import com.premraj.notiflow.data.AppThemeMode
 
 private val LightColors = lightColorScheme(
     primary = Color(0xFF365E9D),
@@ -35,13 +35,45 @@ private val DarkColors = darkColorScheme(
     surfaceVariant = Color(0xFF44474F)
 )
 
+private val AmoledColors = darkColorScheme(
+    primary = Color(0xFFAEC6FF),
+    onPrimary = Color(0xFF002E69),
+    primaryContainer = Color(0xFF16457F),
+    secondary = Color(0xFFBAC8DB),
+    secondaryContainer = Color(0xFF3B4858),
+    tertiary = Color(0xFFDDBBDD),
+    surface = Color.Black,
+    surfaceVariant = Color(0xFF1A1A1A),
+    background = Color.Black
+)
+
+object ThemeResolver {
+    fun isDark(mode: AppThemeMode, systemDark: Boolean): Boolean = when (mode) {
+        AppThemeMode.SYSTEM -> systemDark
+        AppThemeMode.LIGHT -> false
+        AppThemeMode.DARK, AppThemeMode.AMOLED -> true
+    }
+
+    fun isAmoled(mode: AppThemeMode): Boolean = mode == AppThemeMode.AMOLED
+}
+
 @Composable
-fun NotiFlowTheme(content: @Composable () -> Unit) {
+fun NotiFlowTheme(
+    themeMode: AppThemeMode = AppThemeMode.SYSTEM,
+    content: @Composable () -> Unit
+) {
     val context = LocalContext.current
-    val dark = isSystemInDarkTheme()
-    val scheme = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-    } else if (dark) DarkColors else LightColors
+    val systemDark = isSystemInDarkTheme()
+    val dark = ThemeResolver.isDark(themeMode, systemDark)
+
+    val scheme = when {
+        ThemeResolver.isAmoled(themeMode) -> AmoledColors
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        }
+        dark -> DarkColors
+        else -> LightColors
+    }
 
     MaterialTheme(colorScheme = scheme, content = content)
 }

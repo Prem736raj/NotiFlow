@@ -80,8 +80,7 @@ class VoiceReaderEngine(
 
     fun shouldAnnounce(item: NotificationItem): Boolean {
         if (!preferences.voiceReaderEnabled) return false
-        val otpCode = ActionExtractor.extractOtpCode(item.title, item.body)
-        if (otpCode != null) return false
+        if (VoiceReaderPolicy.isOtp(item)) return false
 
         val am = audioManager
         if (am != null && am.mode == AudioManager.MODE_IN_CALL) return false
@@ -101,7 +100,7 @@ class VoiceReaderEngine(
         val allowedByFilter = when (filter) {
             VoiceReaderFilter.VIP_ONLY -> preferences.isVip(item.packageName, item.sender)
             VoiceReaderFilter.MESSAGES_ONLY -> item.category == NotificationCategory.MESSAGE
-            VoiceReaderFilter.ALL_EXCEPT_OTP -> otpCode == null
+            VoiceReaderFilter.ALL_EXCEPT_OTP -> true
         }
         return allowedByFilter
     }
@@ -142,6 +141,10 @@ class VoiceReaderEngine(
 }
 
 object VoiceReaderPolicy {
+    fun isOtp(item: NotificationItem): Boolean =
+        item.category == NotificationCategory.OTP ||
+            ActionExtractor.extractOtpCode(item.title, item.body) != null
+
     fun buildAnnouncement(item: NotificationItem, detail: VoiceReadingDetail): String {
         val appName = item.appName.ifBlank { "New notification" }
         val sender = item.sender?.takeIf { it.isNotBlank() }

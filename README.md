@@ -67,7 +67,7 @@ From a machine with the Android SDK configured:
 ./gradlew assembleDebug
 ```
 
-The repository also contains `.github/workflows/android.yml` on the production-hardening branch to run unit tests, lint, and a debug assembly. Until that workflow produces a successful run, CI remains **unverified**, not passed.
+The repository also contains `.github/workflows/android.yml` on the production-hardening branch which runs unit tests, lint, and a debug assembly in GitHub Actions (verified passing in CI Runs `36440635850` and `36441460246`).
 
 ## Device verification still required
 

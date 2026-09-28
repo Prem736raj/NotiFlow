@@ -46,8 +46,8 @@ Local verification executed with Android SDK 37 (API 36.1 extension), Java 17, a
 
 | Command | Local verification result | Evidence / output |
 |---|---|---|
-| `./gradlew.bat testDebugUnitTest` | ✅ PASS | 58 tests passed (0 failed, 0 skipped) |
-| `./gradlew.bat lintDebug` | ✅ PASS | BUILD SUCCESSFUL in 7m 35s (0 errors, SARIF/HTML generated) |
+| `./gradlew.bat testDebugUnitTest` | ✅ PASS | 66 tests passed across 11 test suites (0 failed, 0 skipped) |
+| `./gradlew.bat lintDebug` | ✅ PASS | BUILD SUCCESSFUL (0 errors, SARIF/HTML generated) |
 | `./gradlew.bat assembleDebug` | ✅ PASS | BUILD SUCCESSFUL in 2m 24s (debug APK assembled) |
 | GitHub Actions | ✅ PASS | Run 36440635850: verify job passed in 5m 3s (test, lint, assemble) |
 
@@ -161,6 +161,9 @@ NotiFlow digest notification with private/public lock-screen variants
 | NF-025 | P1 | Compose Lint | `DetailScreen.kt` | Locale formatting | Locale.getDefault() is non-observable inside Compose | Lint NonObservableLocale warning/error | Switched to LocalLocale.current.platformLocale | lintDebug |
 | NF-026 | P1 | Android 12+ Backup | `data_extraction_rules.xml`, `AndroidManifest.xml` | Backup rules | Android 12+ requires data_extraction_rules with explicit domain attributes | Lint missing attribute and data leak risk | Created compliant data_extraction_rules.xml with explicit domains disallowing cloud/transfer | lintDebug |
 | NF-027 | P1 | Financial parsing | `ExpenseParser.kt` | payment due vs debit regex | "payment due" bills parsed as debit expenses | false positive financial transactions created for pending bills | Added negative filter for due reminders without debit keywords, tightened merchant regex | unit (ExpenseParserTest) |
+| NF-028 | P1 | Voice Reader OTP safety | `VoiceReaderEngine.kt` | `shouldAnnounce` / `VoiceReaderPolicy` | only checked extracted code; missed unparsed OTP notifications | audible leakage of unparsed OTP content | Added `VoiceReaderPolicy.isOtp()` rejecting both OTP category and extracted code | unit (VoiceReaderTest) |
+| NF-029 | P2 | Theme system end-to-end | `Theme.kt`, `MainActivity.kt`, `ThemeTest.kt` | `NotiFlowTheme` & `AppThemeMode` | theme setting ignored by `NotiFlowTheme`; AMOLED mode missing; test empty | theme preference changes had no UI effect | Implemented `ThemeResolver`, wired `appThemeMode` into Compose, added AMOLED palette, populated `ThemeTest.kt` | unit (ThemeTest) |
+| NF-030 | P2 | DB relational integrity | `NotificationStore.kt` | `deleteUnwantedOldMessages` | bulk deletion of spam/promo left orphaned expenses | database orphaned records | Added post-delete purge query for orphaned `expense_transactions` | DB/unit |
 
 ## Settings truth table
 
@@ -274,8 +277,8 @@ Scores are an audit snapshot of evidence on this branch, not a release certifica
 | Performance | 4 | no large-history benchmarks |
 | Accessibility | 4 | Compose semantics exist but TalkBack/font-scale/contrast matrix unverified |
 | UI/UX | 6 | misleading controls/copy reduced; Compose lint clean; device usability review pending |
-| Tests | 7 | 58 JVM tests passing across crypto, backup, focus, voice, parser, intelligence, notification ID |
-| CI | 5 | workflow repaired to use modern setup-android + scoped SDK packages; awaiting push |
+| Tests | 8 | 66 JVM tests passing across 11 test suites: theme, crypto, backup, focus, voice, parser, intelligence, notification ID |
+| CI | 9 | GitHub Actions workflow passing green on pull request runs 36440635850 and 36441460246 |
 | Release | 3 | release signing/minify/bundle gates not yet proven |
 | Play readiness | 2 | privacy policy/Data Safety/policy verification/device matrix incomplete |
 | Product focus | 6 | rules-first inbox is coherent; secondary feature scope remains broad |

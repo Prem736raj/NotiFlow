@@ -3,12 +3,14 @@ package com.premraj.notiflow
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.activity.compose.setContent
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.premraj.notiflow.ui.NotiFlowApp
 import com.premraj.notiflow.ui.NotiFlowTheme
 import com.premraj.notiflow.ui.NotiFlowViewModel
@@ -23,7 +25,9 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         readIntent(intent)
         setContent {
-            NotiFlowTheme {
+            val prefVersion by viewModel.preferencesVersion.collectAsStateWithLifecycle()
+            val themeMode = remember(prefVersion) { viewModel.preferences.appThemeMode }
+            NotiFlowTheme(themeMode = themeMode) {
                 NotiFlowApp(
                     viewModel = viewModel,
                     requestedNotificationId = requestedNotificationId,

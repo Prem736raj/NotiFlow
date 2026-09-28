@@ -303,6 +303,9 @@ class NotificationStore(context: Context) {
             """.trimIndent(),
             arrayOf(cutoff.toString())
         )
+        if (count > 0) {
+            helper.writableDatabase.execSQL("DELETE FROM $TABLE_EXPENSES WHERE notification_id NOT IN (SELECT id FROM $TABLE)")
+        }
         refresh()
         count
     }

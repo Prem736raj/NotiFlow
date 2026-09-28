@@ -7,7 +7,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.security.SecureRandom
 import java.text.SimpleDateFormat
-import java.util.Base64
 import java.util.Date
 import java.util.Locale
 import javax.crypto.Cipher
@@ -57,6 +56,12 @@ object BackupExporter {
         notifications: List<NotificationItem>,
         preferences: UserPreferences,
         password: String
+    ): String = createEncryptedBackup(notifications, preferences.vipRules(), password)
+
+    fun createEncryptedBackup(
+        notifications: List<NotificationItem>,
+        vipRules: Set<String>,
+        password: String
     ): String {
         val root = JSONObject()
         root.put("version", 1)
@@ -80,7 +85,7 @@ object BackupExporter {
         root.put("notifications", notifArray)
 
         val vipArray = JSONArray()
-        preferences.vipRules().forEach { vipArray.put(it) }
+        vipRules.forEach { vipArray.put(it) }
         root.put("vip_rules", vipArray)
 
         val jsonString = root.toString()
@@ -109,11 +114,11 @@ object BackupExporter {
         System.arraycopy(iv, 0, combined, salt.size, iv.size)
         System.arraycopy(cipherText, 0, combined, salt.size + iv.size, cipherText.size)
 
-        return Base64.getEncoder().encodeToString(combined)
+        return Base64Compat.encodeToString(combined)
     }
 
     private fun decrypt(encryptedBase64: String, password: String): String {
-        val combined = Base64.getDecoder().decode(encryptedBase64)
+        val combined = Base64Compat.decode(encryptedBase64)
         if (combined.size < SALT_LENGTH + IV_LENGTH) {
             throw IllegalArgumentException("Invalid payload length")
         }

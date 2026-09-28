@@ -70,4 +70,5 @@ dependencies {
     implementation("com.google.mediapipe:tasks-genai:0.10.27")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 }

@@ -3,7 +3,6 @@ package com.premraj.notiflow.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -68,7 +67,7 @@ fun ExpensesDashboard(
 ) {
     var selectedRange by remember { mutableStateOf(ExpenseTimeRange.THIS_MONTH) }
     var transactionFilter by remember { mutableStateOf<TransactionType?>(null) }
-    val dark = isSystemInDarkTheme()
+    val dark = LocalNotiFlowDarkTheme.current
 
     val summary by produceState(
         initialValue = ExpenseSummary(0.0, 0.0, 0.0, 0, 0, emptyMap(), emptyList()),
@@ -270,7 +269,12 @@ fun ExpensesDashboard(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Text(category.emoji, fontSize = 16.sp)
+                                    Icon(
+                                        imageVector = Icons.Outlined.ReceiptLong,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                     Text(
                                         text = category.label,
                                         style = MaterialTheme.typography.bodyMedium,
@@ -430,7 +434,7 @@ fun ExpenseTransactionCard(
     modifier: Modifier = Modifier
 ) {
     val isDebit = transaction.transactionType == TransactionType.DEBIT
-    val dark = isSystemInDarkTheme()
+    val dark = LocalNotiFlowDarkTheme.current
 
     Card(
         modifier = modifier
@@ -459,9 +463,15 @@ fun ExpenseTransactionCard(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = transaction.expenseCategory.emoji,
-                    fontSize = 20.sp
+                Icon(
+                    imageVector = Icons.Outlined.ReceiptLong,
+                    contentDescription = null,
+                    tint = if (isDebit) {
+                        if (dark) Color(0xFFF87171) else Color(0xFFDC2626)
+                    } else {
+                        if (dark) Color(0xFF34D399) else Color(0xFF059669)
+                    },
+                    modifier = Modifier.size(20.dp)
                 )
             }
 

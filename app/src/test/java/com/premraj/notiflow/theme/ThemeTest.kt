@@ -46,4 +46,11 @@ class ThemeTest {
         assertTrue(ThemeResolver.isDark(AppThemeMode.AMOLED, systemDark = true))
         assertTrue(ThemeResolver.isAmoled(AppThemeMode.AMOLED))
     }
+
+    @Test
+    fun dynamicColorIsExplicitAndNeverOverridesAmoled() {
+        assertFalse(ThemeResolver.shouldUseDynamicColor(AppThemeMode.SYSTEM, useDynamicColor = false))
+        assertTrue(ThemeResolver.shouldUseDynamicColor(AppThemeMode.SYSTEM, useDynamicColor = true))
+        assertFalse(ThemeResolver.shouldUseDynamicColor(AppThemeMode.AMOLED, useDynamicColor = true))
+    }
 }

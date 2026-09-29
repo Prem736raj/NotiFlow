@@ -1,5 +1,6 @@
 package com.premraj.notiflow.ui
 
+import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -8,8 +9,12 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.view.WindowCompat
 import com.premraj.notiflow.data.AppThemeMode
 
 private val LightColors = lightColorScheme(
@@ -55,11 +60,17 @@ object ThemeResolver {
     }
 
     fun isAmoled(mode: AppThemeMode): Boolean = mode == AppThemeMode.AMOLED
+
+    fun shouldUseDynamicColor(mode: AppThemeMode, useDynamicColor: Boolean): Boolean =
+        useDynamicColor && mode != AppThemeMode.AMOLED
 }
+
+val LocalNotiFlowDarkTheme = staticCompositionLocalOf { false }
 
 @Composable
 fun NotiFlowTheme(
     themeMode: AppThemeMode = AppThemeMode.SYSTEM,
+    useDynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
@@ -68,12 +79,23 @@ fun NotiFlowTheme(
 
     val scheme = when {
         ThemeResolver.isAmoled(themeMode) -> AmoledColors
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+        ThemeResolver.shouldUseDynamicColor(themeMode, useDynamicColor) &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
         dark -> DarkColors
         else -> LightColors
     }
 
-    MaterialTheme(colorScheme = scheme, content = content)
+    SideEffect {
+        val activity = context as? Activity ?: return@SideEffect
+        WindowCompat.getInsetsController(activity.window, activity.window.decorView).apply {
+            isAppearanceLightStatusBars = !dark
+            isAppearanceLightNavigationBars = !dark
+        }
+    }
+
+    CompositionLocalProvider(LocalNotiFlowDarkTheme provides dark) {
+        MaterialTheme(colorScheme = scheme, content = content)
+    }
 }

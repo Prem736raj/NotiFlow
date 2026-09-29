@@ -13,7 +13,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -73,86 +72,39 @@ import com.premraj.notiflow.intelligence.LocalIntelligence
 data class CategoryStyle(
     val shortLabel: String,
     val icon: ImageVector,
-    val accentColor: Color,
     val containerColor: Color,
     val onContainerColor: Color
 )
 
 @Composable
 fun getCategoryStyle(category: NotificationCategory): CategoryStyle {
-    val dark = isSystemInDarkTheme()
-    return when (category) {
-        NotificationCategory.OTP -> CategoryStyle(
-            shortLabel = "OTP",
-            icon = Icons.Outlined.Key,
-            accentColor = Color(0xFF10B981),
-            containerColor = if (dark) Color(0xFF064E3B).copy(alpha = 0.55f) else Color(0xFFD1FAE5),
-            onContainerColor = if (dark) Color(0xFF6EE7B7) else Color(0xFF065F46)
-        )
-        NotificationCategory.PAYMENT -> CategoryStyle(
-            shortLabel = "Payment",
-            icon = Icons.Outlined.CreditCard,
-            accentColor = Color(0xFF38BDF8),
-            containerColor = if (dark) Color(0xFF0C4A6E).copy(alpha = 0.55f) else Color(0xFFE0F2FE),
-            onContainerColor = if (dark) Color(0xFF7DD3FC) else Color(0xFF0369A1)
-        )
-        NotificationCategory.DELIVERY -> CategoryStyle(
-            shortLabel = "Delivery",
-            icon = Icons.Outlined.LocalShipping,
-            accentColor = Color(0xFFF59E0B),
-            containerColor = if (dark) Color(0xFF78350F).copy(alpha = 0.55f) else Color(0xFFFEF3C7),
-            onContainerColor = if (dark) Color(0xFFFCD34D) else Color(0xFF92400E)
-        )
-        NotificationCategory.MESSAGE -> CategoryStyle(
-            shortLabel = "Message",
-            icon = Icons.Outlined.ChatBubbleOutline,
-            accentColor = Color(0xFFA78BFA),
-            containerColor = if (dark) Color(0xFF4C1D95).copy(alpha = 0.55f) else Color(0xFFEDE9FE),
-            onContainerColor = if (dark) Color(0xFFC4B5FD) else Color(0xFF5B21B6)
-        )
-        NotificationCategory.WORK_STUDY -> CategoryStyle(
-            shortLabel = "Work",
-            icon = Icons.Outlined.WorkOutline,
-            accentColor = Color(0xFF2DD4BF),
-            containerColor = if (dark) Color(0xFF134E4A).copy(alpha = 0.55f) else Color(0xFFCCFBF1),
-            onContainerColor = if (dark) Color(0xFF5EEAD4) else Color(0xFF115E59)
-        )
-        NotificationCategory.REMINDER_EVENT -> CategoryStyle(
-            shortLabel = "Event",
-            icon = Icons.Outlined.Event,
-            accentColor = Color(0xFFFB7185),
-            containerColor = if (dark) Color(0xFF881337).copy(alpha = 0.55f) else Color(0xFFFFE4E6),
-            onContainerColor = if (dark) Color(0xFFFDA4AF) else Color(0xFF9F1239)
-        )
-        NotificationCategory.SOCIAL -> CategoryStyle(
-            shortLabel = "Social",
-            icon = Icons.Outlined.FavoriteBorder,
-            accentColor = Color(0xFFF472B6),
-            containerColor = if (dark) Color(0xFF831843).copy(alpha = 0.55f) else Color(0xFFFCE7F3),
-            onContainerColor = if (dark) Color(0xFFF9A8D4) else Color(0xFF9D174D)
-        )
-        NotificationCategory.PROMOTION -> CategoryStyle(
-            shortLabel = "Promo",
-            icon = Icons.Outlined.LocalOffer,
-            accentColor = Color(0xFFC084FC),
-            containerColor = if (dark) Color(0xFF581C87).copy(alpha = 0.55f) else Color(0xFFF3E8FF),
-            onContainerColor = if (dark) Color(0xFFE9D5FF) else Color(0xFF7E22CE)
-        )
-        NotificationCategory.SPAM -> CategoryStyle(
-            shortLabel = "Spam",
-            icon = Icons.Outlined.Block,
-            accentColor = Color(0xFFF87171),
-            containerColor = if (dark) Color(0xFF7F1D1D).copy(alpha = 0.55f) else Color(0xFFFEE2E2),
-            onContainerColor = if (dark) Color(0xFFFCA5A5) else Color(0xFF991B1B)
-        )
-        NotificationCategory.OTHER -> CategoryStyle(
-            shortLabel = "Alert",
-            icon = Icons.Outlined.Notifications,
-            accentColor = Color(0xFF94A3B8),
-            containerColor = if (dark) Color(0xFF1E293B).copy(alpha = 0.55f) else Color(0xFFF1F5F9),
-            onContainerColor = if (dark) Color(0xFFCBD5E1) else Color(0xFF475569)
-        )
+    val (label, icon) = when (category) {
+        NotificationCategory.OTP -> "OTP" to Icons.Outlined.Key
+        NotificationCategory.PAYMENT -> "Payment" to Icons.Outlined.CreditCard
+        NotificationCategory.DELIVERY -> "Delivery" to Icons.Outlined.LocalShipping
+        NotificationCategory.MESSAGE -> "Message" to Icons.Outlined.ChatBubbleOutline
+        NotificationCategory.WORK_STUDY -> "Work" to Icons.Outlined.WorkOutline
+        NotificationCategory.REMINDER_EVENT -> "Event" to Icons.Outlined.Event
+        NotificationCategory.SOCIAL -> "Social" to Icons.Outlined.FavoriteBorder
+        NotificationCategory.PROMOTION -> "Promo" to Icons.Outlined.LocalOffer
+        NotificationCategory.SPAM -> "Spam" to Icons.Outlined.Block
+        NotificationCategory.OTHER -> "Alert" to Icons.Outlined.Notifications
     }
+    val isWarning = category == NotificationCategory.SPAM
+    return CategoryStyle(
+        shortLabel = label,
+        icon = icon,
+        containerColor = if (isWarning) {
+            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.72f)
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHighest
+        },
+        onContainerColor = if (isWarning) {
+            MaterialTheme.colorScheme.onErrorContainer
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        }
+    )
 }
 
 @Composable
@@ -178,15 +130,13 @@ fun NotificationCard(
     }
 
     val cardBorder = if (isHighPriority) {
-        BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.45f))
-    } else {
-        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
-    }
+        BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+    } else null
 
     val containerColor = if (isHighPriority) {
-        MaterialTheme.colorScheme.surfaceContainerHigh
-    } else {
         MaterialTheme.colorScheme.surfaceContainer
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerLow
     }
 
     Card(
@@ -195,7 +145,7 @@ fun NotificationCard(
             .fillMaxWidth()
             .animateContentSize(),
         colors = CardDefaults.cardColors(containerColor = containerColor),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(14.dp),
         border = cardBorder
     ) {
         Row(
@@ -206,16 +156,9 @@ fun NotificationCard(
             if (isHighPriority) {
                 Box(
                     modifier = Modifier
-                        .width(4.dp)
+                        .width(3.dp)
                         .fillMaxHeight()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(
-                                    MaterialTheme.colorScheme.primary,
-                                    MaterialTheme.colorScheme.secondary
-                                )
-                            )
-                        )
+                        .background(MaterialTheme.colorScheme.primary)
                 )
             }
 
@@ -324,7 +267,7 @@ fun NotificationCard(
                                     fontFamily = FontFamily.Monospace,
                                     letterSpacing = 1.sp
                                 ),
-                                color = if (isSystemInDarkTheme()) Color(0xFF6EE7B7) else Color(0xFF047857)
+                                color = if (LocalNotiFlowDarkTheme.current) Color(0xFF6EE7B7) else Color(0xFF047857)
                             )
                             Text(
                                 text = "• Auto-copied (tap to re-copy)",
@@ -356,7 +299,7 @@ fun NotificationCard(
                             Text(
                                 text = paymentAmount,
                                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                color = if (isSystemInDarkTheme()) Color(0xFF7DD3FC) else Color(0xFF0369A1)
+                                color = if (LocalNotiFlowDarkTheme.current) Color(0xFF7DD3FC) else Color(0xFF0369A1)
                             )
                         }
                     }
@@ -467,27 +410,17 @@ fun AppBadge(appName: String, modifier: Modifier = Modifier) {
     val initials = appName.split(Regex("\\s+")).filter { it.isNotBlank() }.take(2)
         .joinToString("") { it.first().uppercase() }.ifBlank { "N" }
 
-    val colorIndex = kotlin.math.abs(appName.hashCode()) % 6
-    val (bgGradient, textTint) = when (colorIndex) {
-        0 -> listOf(Color(0xFF6366F1), Color(0xFF4338CA)) to Color(0xFFEEF2FF)
-        1 -> listOf(Color(0xFF0284C7), Color(0xFF0369A1)) to Color(0xFFF0F9FF)
-        2 -> listOf(Color(0xFF10B981), Color(0xFF047857)) to Color(0xFFECFDF5)
-        3 -> listOf(Color(0xFFF59E0B), Color(0xFFB45309)) to Color(0xFFFFFBEB)
-        4 -> listOf(Color(0xFF8B5CF6), Color(0xFF6D28D9)) to Color(0xFFF5F3FF)
-        else -> listOf(Color(0xFFEC4899), Color(0xFFBE185D)) to Color(0xFFFDF2F8)
-    }
-
     Box(
         modifier = modifier
-            .size(44.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(Brush.linearGradient(bgGradient)),
+            .size(40.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = initials,
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-            color = textTint
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -525,24 +458,16 @@ fun EmptyState(
     ) {
         Box(
             modifier = Modifier
-                .size(76.dp)
+                .size(64.dp)
                 .clip(CircleShape)
-                .background(
-                    Brush.radialGradient(
-                        listOf(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                            MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.05f)
-                        )
-                    )
-                )
-                .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), CircleShape),
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                modifier = Modifier.size(34.dp),
-                tint = MaterialTheme.colorScheme.primary
+                modifier = Modifier.size(28.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         Spacer(Modifier.height(18.dp))

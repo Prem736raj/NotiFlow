@@ -27,7 +27,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             val prefVersion by viewModel.preferencesVersion.collectAsStateWithLifecycle()
             val themeMode = remember(prefVersion) { viewModel.preferences.appThemeMode }
-            NotiFlowTheme(themeMode = themeMode) {
+            val useDynamicColors = remember(prefVersion) { viewModel.preferences.useDynamicColors }
+            NotiFlowTheme(themeMode = themeMode, useDynamicColor = useDynamicColors) {
                 NotiFlowApp(
                     viewModel = viewModel,
                     requestedNotificationId = requestedNotificationId,

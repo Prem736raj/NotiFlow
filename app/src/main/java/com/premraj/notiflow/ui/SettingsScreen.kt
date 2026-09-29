@@ -247,7 +247,7 @@ fun SettingsScreen(
             item {
                 SettingsCard(Icons.Outlined.Palette, "Appearance & Theme") {
                     Text(
-                        "Customize NotiFlow's design with Dynamic Material You or save maximum battery life with pure AMOLED black.",
+                        "Choose how NotiFlow itself should look. Device wallpaper colors are optional so the app keeps a consistent identity by default.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -266,6 +266,12 @@ fun SettingsScreen(
                             )
                         }
                     }
+                    SettingSwitch(
+                        title = "Use device colors",
+                        subtitle = "Apply Android's wallpaper-derived Material You palette. AMOLED keeps pure black backgrounds.",
+                        checked = prefs.useDynamicColors,
+                        onChecked = viewModel::setUseDynamicColors
+                    )
                 }
             }
 
@@ -411,7 +417,7 @@ fun SettingsScreen(
                         onClick = { viewModel.testVoiceAnnouncement() },
                         modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
                     ) {
-                        Text("🔊 Test voice announcement")
+                        Text("Test voice announcement")
                     }
                 }
             }
@@ -512,7 +518,7 @@ fun SettingsScreen(
             }
 
             item {
-                SettingsCard(Icons.Outlined.AutoAwesome, "On-device AI Engine") {
+                SettingsCard(Icons.Outlined.AutoAwesome, "Smart classification") {
                     Text(
                         "Rules-only classification is active. Local AI activation is unavailable until NotiFlow has a verified model identity, integrity check, and production-ready import/acquisition flow.",
                         style = MaterialTheme.typography.bodyMedium,
@@ -708,36 +714,29 @@ private fun SettingsCard(
     title: String,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
-    ) {
-        Column(Modifier.padding(18.dp)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(17.dp)
-                    )
-                }
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            }
-            Spacer(Modifier.height(14.dp))
-            content()
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(horizontal = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(19.dp)
+            )
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
         }
+        Spacer(Modifier.height(10.dp))
+        content()
+        Spacer(Modifier.height(14.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     }
 }
 

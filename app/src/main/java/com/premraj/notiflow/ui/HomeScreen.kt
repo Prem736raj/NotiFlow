@@ -5,7 +5,6 @@ import android.provider.Settings
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -94,7 +93,7 @@ fun HomeScreen(
     onSettings: () -> Unit
 ) {
     val context = LocalContext.current
-    val dark = isSystemInDarkTheme()
+    val dark = LocalNotiFlowDarkTheme.current
 
     val nowItems = notifications.filter {
         it.state == NotificationState.ACTIVE &&
@@ -148,17 +147,9 @@ fun HomeScreen(
                             )
                             Text(
                                 text = "NotiFlow",
-                                style = TextStyle(
-                                    brush = Brush.horizontalGradient(
-                                        listOf(
-                                            MaterialTheme.colorScheme.primary,
-                                            MaterialTheme.colorScheme.secondary
-                                        )
-                                    ),
-                                    fontSize = 24.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    letterSpacing = (-0.5).sp
-                                )
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
                         Text(
@@ -280,90 +271,96 @@ fun HomeScreen(
                 }
             }
 
-            // Interactive metric segmented bar
+            // Primary workflow navigation stays focused on notification states.
             item {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     item {
-                        InteractiveMetricCard(
-                            label = "Important",
-                            count = highPriorityCount,
-                            icon = Icons.Outlined.Star,
-                            accentColor = MaterialTheme.colorScheme.primary,
-                            isSelected = selectedSection == HomeSection.NOW && highPriorityCount > 0,
-                            onClick = { onSectionChange(HomeSection.NOW) }
-                        )
-                    }
-                    item {
-                        InteractiveMetricCard(
+                        SectionChip(
                             label = "Now",
                             count = nowItems.size,
                             icon = Icons.Outlined.Notifications,
-                            accentColor = MaterialTheme.colorScheme.secondary,
                             isSelected = selectedSection == HomeSection.NOW,
                             onClick = { onSectionChange(HomeSection.NOW) }
                         )
                     }
                     item {
-                        InteractiveMetricCard(
+                        SectionChip(
                             label = "Later",
                             count = laterItems.size,
                             icon = Icons.Outlined.AccessTime,
-                            accentColor = Color(0xFF38BDF8),
                             isSelected = selectedSection == HomeSection.LATER,
                             onClick = { onSectionChange(HomeSection.LATER) }
                         )
                     }
                     item {
-                        InteractiveMetricCard(
+                        SectionChip(
                             label = "Digest",
                             count = digestItems.size,
                             icon = Icons.Outlined.ViewList,
-                            accentColor = Color(0xFFA855F7),
                             isSelected = selectedSection == HomeSection.DIGEST,
                             onClick = { onSectionChange(HomeSection.DIGEST) }
                         )
                     }
                     item {
-                        InteractiveMetricCard(
+                        SectionChip(
                             label = "History",
                             count = historyItems.size,
                             icon = Icons.Outlined.History,
-                            accentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                             isSelected = selectedSection == HomeSection.HISTORY,
                             onClick = { onSectionChange(HomeSection.HISTORY) }
                         )
                     }
+                }
+            }
+
+            if (selectedSection == HomeSection.NOW && highPriorityCount > 0) {
+                item {
+                    Text(
+                        text = "$highPriorityCount important ${if (highPriorityCount == 1) "item" else "items"} need attention",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 18.dp)
+                    )
+                }
+            }
+
+            // Secondary tools remain available without competing with the inbox states.
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     item {
-                        InteractiveMetricCard(
+                        SectionChip(
                             label = "Expenses",
                             count = expenses.size,
                             icon = Icons.Outlined.AccountBalanceWallet,
-                            accentColor = Color(0xFF10B981),
                             isSelected = selectedSection == HomeSection.EXPENSES,
+                            secondary = true,
                             onClick = { onSectionChange(HomeSection.EXPENSES) }
                         )
                     }
                     item {
-                        InteractiveMetricCard(
+                        SectionChip(
                             label = "Insights",
-                            count = notifications.size,
+                            count = null,
                             icon = Icons.Outlined.BarChart,
-                            accentColor = Color(0xFF6366F1),
                             isSelected = selectedSection == HomeSection.INSIGHTS,
+                            secondary = true,
                             onClick = { onSectionChange(HomeSection.INSIGHTS) }
                         )
                     }
                     if (deletedItems.isNotEmpty()) {
                         item {
-                            InteractiveMetricCard(
+                            SectionChip(
                                 label = "Source removed",
                                 count = deletedItems.size,
                                 icon = Icons.Outlined.Security,
-                                accentColor = Color(0xFFEF4444),
                                 isSelected = selectedSection == HomeSection.DELETED,
+                                secondary = true,
                                 onClick = { onSectionChange(HomeSection.DELETED) }
                             )
                         }
@@ -445,64 +442,53 @@ fun HomeScreen(
 }
 
 @Composable
-private fun InteractiveMetricCard(
+private fun SectionChip(
     label: String,
-    count: Int,
+    count: Int?,
     icon: ImageVector,
-    accentColor: Color,
     isSelected: Boolean,
+    secondary: Boolean = false,
     onClick: () -> Unit
 ) {
-    val dark = isSystemInDarkTheme()
-    val bgColor = if (isSelected) {
-        if (dark) accentColor.copy(alpha = 0.16f) else accentColor.copy(alpha = 0.12f)
-    } else {
-        MaterialTheme.colorScheme.surfaceContainer
-    }
-
-    val borderColor = if (isSelected) {
-        accentColor.copy(alpha = 0.6f)
-    } else {
-        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
-    }
-
-    Card(
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = bgColor),
-        border = BorderStroke(1.dp, borderColor),
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = when {
+            isSelected -> MaterialTheme.colorScheme.primaryContainer
+            secondary -> MaterialTheme.colorScheme.surfaceContainerLow
+            else -> MaterialTheme.colorScheme.surfaceContainer
+        },
+        border = if (isSelected) {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+        } else null,
         modifier = Modifier.clickable(onClick = onClick)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(7.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(accentColor.copy(alpha = 0.18f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = accentColor,
-                    modifier = Modifier.size(15.dp)
-                )
-            }
-            Text(
-                text = count.toString(),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = if (isSelected) accentColor else MaterialTheme.colorScheme.onSurface
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
             )
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
-                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                else MaterialTheme.colorScheme.onSurfaceVariant
             )
+            count?.let {
+                Text(
+                    text = it.toString(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                    else MaterialTheme.colorScheme.outline
+                )
+            }
         }
     }
 }

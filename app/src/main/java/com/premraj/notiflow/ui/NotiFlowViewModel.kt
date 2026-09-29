@@ -357,6 +357,11 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
         bumpPrefs()
     }
 
+    fun setUseDynamicColors(enabled: Boolean) {
+        graph.preferences.useDynamicColors = enabled
+        bumpPrefs()
+    }
+
     suspend fun createEncryptedArchive(password: String): String {
         val allNotifications = graph.store.allItems()
         return withContext(Dispatchers.Default) {

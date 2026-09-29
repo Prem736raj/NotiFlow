@@ -161,6 +161,10 @@ class UserPreferences internal constructor(private val prefs: SharedPreferences)
         }
         set(value) = prefs.edit().putString(KEY_APP_THEME_MODE, value.name).apply()
 
+    var useDynamicColors: Boolean
+        get() = prefs.getBoolean(KEY_USE_DYNAMIC_COLORS, false)
+        set(value) = prefs.edit().putBoolean(KEY_USE_DYNAMIC_COLORS, value).apply()
+
     var modelDownloadAutoStarted: Boolean
         get() = prefs.getBoolean(KEY_MODEL_AUTO_DOWNLOAD_STARTED, false)
         set(value) = prefs.edit().putBoolean(KEY_MODEL_AUTO_DOWNLOAD_STARTED, value).apply()
@@ -327,6 +331,7 @@ class UserPreferences internal constructor(private val prefs: SharedPreferences)
         const val KEY_FOCUS_ACTIVATED_AT = "focus_activated_at"
         const val KEY_FOCUS_SESSION_TOKEN = "focus_session_token"
         const val KEY_APP_THEME_MODE = "app_theme_mode"
+        const val KEY_USE_DYNAMIC_COLORS = "use_dynamic_colors"
         const val KEY_MODEL_AUTO_DOWNLOAD_STARTED = "model_auto_download_started"
     }
 }

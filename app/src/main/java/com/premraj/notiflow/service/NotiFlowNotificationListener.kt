@@ -225,16 +225,18 @@ class NotiFlowNotificationListener : NotificationListenerService() {
         val safeToSuppress =
             !sensitiveByDeterministicRules &&
             LocalIntelligence.isSafeLowValueForSuppression(stored)
-        val quietWouldSuppress = (quietBySource || quietByCategory) && safeToSuppress
-        val focusWouldSuppress = focusStatus.isActive && safeToSuppress
 
-        if (quietWouldSuppress || focusWouldSuppress) {
+        // Record suppressed metric for active focus mode without destroying the source notification
+        if (focusStatus.isActive && safeToSuppress) {
+            graph.focusEngine.recordSuppressed()
+        }
+
+        // Destructive status-bar cancellation is disabled for heuristic Focus Mode.
+        // Never destroy source notifications from the Android status bar based on heuristic classification.
+        // Only explicit user-configured quiet sources or categories are cancelled.
+        val quietWouldSuppress = (quietBySource || quietByCategory) && safeToSuppress
+        if (quietWouldSuppress) {
             runCatching { cancelNotification(sbn.key) }
-                .onSuccess {
-                    if (focusWouldSuppress && !quietWouldSuppress) {
-                        graph.focusEngine.recordSuppressed()
-                    }
-                }
         }
     }
 
@@ -278,6 +280,13 @@ class NotiFlowNotificationListener : NotificationListenerService() {
 
             val manager = getSystemService(NotificationManager::class.java)
             manager.notify(NotificationPosting.safeNotificationId(notificationId, 90_000), alert)
+        }
+    }
+
+    override fun onNotificationRemoved(sbn: StatusBarNotification) {
+        if (sbn.packageName == packageName) return
+        scope.launch {
+            appGraph.store.markRemoved(sbn.key, removedBySource = false)
         }
     }
 

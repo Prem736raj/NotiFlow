@@ -115,7 +115,9 @@ fun NotiFlowApp(
         AppScreen.DETAIL -> {
             val item = notifications.firstOrNull { it.id == detailId }
             if (item == null) {
-                LaunchedEffect(detailId) { screen = AppScreen.HOME.name }
+                if (initialLoadComplete) {
+                    LaunchedEffect(detailId) { screen = AppScreen.HOME.name }
+                }
             } else {
                 DetailScreen(
                     item = item,

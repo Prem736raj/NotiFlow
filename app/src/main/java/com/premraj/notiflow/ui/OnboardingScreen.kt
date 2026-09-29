@@ -3,6 +3,7 @@ package com.premraj.notiflow.ui
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -33,6 +34,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -108,6 +110,17 @@ fun OnboardingScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    Spacer(Modifier.height(6.dp))
+                    TextButton(
+                        onClick = {
+                            runCatching {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://prem736raj.github.io/NotiFlow/privacy-policy"))
+                                context.startActivity(intent)
+                            }
+                        }
+                    ) {
+                        Text("Read full Privacy Policy")
+                    }
                 }
             }
 
@@ -120,7 +133,11 @@ fun OnboardingScreen(
             )
             Spacer(Modifier.height(10.dp))
             OutlinedButton(
-                onClick = { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) },
+                onClick = {
+                    runCatching {
+                        context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                    }
+                },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(if (listenerEnabled) "Review notification access" else "Enable notification access")

@@ -257,7 +257,11 @@ fun HomeScreen(
                             }
                             Spacer(Modifier.height(14.dp))
                             Button(
-                                onClick = { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) },
+                                onClick = {
+                                    runCatching {
+                                        context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                                    }
+                                },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = Color(0xFFF59E0B),
                                     contentColor = Color(0xFF451A03)

@@ -1,10 +1,12 @@
 package com.premraj.notiflow.util
 
+import android.content.Context
 import com.premraj.notiflow.data.ExpenseTransaction
 import com.premraj.notiflow.data.NotificationItem
 import com.premraj.notiflow.data.UserPreferences
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.security.SecureRandom
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -95,6 +97,28 @@ object BackupExporter {
     fun decryptBackup(encryptedPayload: String, password: String): Result<JSONObject> = runCatching {
         val jsonString = decrypt(encryptedPayload, password)
         JSONObject(jsonString)
+    }
+
+    fun writeEncryptedBackupToFile(
+        context: Context,
+        encryptedPayload: String,
+        fileName: String = "notiflow-backup-${System.currentTimeMillis()}.enc"
+    ): File {
+        val backupsDir = File(context.cacheDir, "backups").apply { mkdirs() }
+        val backupFile = File(backupsDir, fileName)
+        backupFile.writeText(encryptedPayload, Charsets.UTF_8)
+        return backupFile
+    }
+
+    fun createEncryptedBackupFile(
+        context: Context,
+        notifications: List<NotificationItem>,
+        preferences: UserPreferences,
+        password: String,
+        fileName: String = "notiflow-backup-${System.currentTimeMillis()}.enc"
+    ): File {
+        val encrypted = createEncryptedBackup(notifications, preferences, password)
+        return writeEncryptedBackupToFile(context, encrypted, fileName)
     }
 
     private fun encrypt(plainText: String, password: String): String {

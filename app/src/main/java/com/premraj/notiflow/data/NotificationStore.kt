@@ -262,7 +262,6 @@ class NotificationStore(context: Context) {
             count += helper.writableDatabase.delete(TABLE, "posted_at<? AND pinned=0 AND remind_at IS NULL AND is_active=0 AND category IN (?,?)", arrayOf(lowValueCutoff.toString(), NotificationCategory.PROMOTION.name, NotificationCategory.SPAM.name))
             val deliveryCutoff = now - minOf(retentionDays, 21) * 86_400_000L
             count += helper.writableDatabase.delete(TABLE, "posted_at<? AND pinned=0 AND remind_at IS NULL AND category=? AND is_active=0", arrayOf(deliveryCutoff.toString(), NotificationCategory.DELIVERY.name))
-            helper.writableDatabase.execSQL("DELETE FROM $TABLE_EXPENSES WHERE notification_id NOT IN (SELECT id FROM $TABLE)")
             refreshFromDb()
             count
         }
@@ -347,7 +346,6 @@ class NotificationStore(context: Context) {
                 """.trimIndent(),
                 arrayOf(cutoff.toString())
             )
-            if (count > 0) helper.writableDatabase.execSQL("DELETE FROM $TABLE_EXPENSES WHERE notification_id NOT IN (SELECT id FROM $TABLE)")
             refreshFromDb()
             count
         }

@@ -2,11 +2,13 @@ package com.premraj.notiflow.ui
 
 import android.Manifest
 import android.app.TimePickerDialog
+import android.content.ClipData
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.core.content.FileProvider
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -167,16 +169,26 @@ fun SettingsScreen(
                         archiveCreating = true
                         archiveError = null
                         scope.launch {
-                            runCatching { viewModel.createEncryptedArchive(password) }
-                                .onSuccess { backupText ->
+                            runCatching { viewModel.createEncryptedArchiveFile(context, password) }
+                                .onSuccess { backupFile ->
                                     backupPassphrase = ""
                                     backupDialog = false
+                                    val uri = FileProvider.getUriForFile(
+                                        context,
+                                        "${context.packageName}.fileprovider",
+                                        backupFile
+                                    )
                                     val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                                        type = "text/plain"
+                                        type = "application/octet-stream"
                                         putExtra(Intent.EXTRA_SUBJECT, "NotiFlow Encrypted Archive")
-                                        putExtra(Intent.EXTRA_TEXT, backupText)
+                                        putExtra(Intent.EXTRA_STREAM, uri)
+                                        clipData = ClipData.newRawUri("NotiFlow Encrypted Archive", uri)
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                     }
-                                    context.startActivity(Intent.createChooser(sendIntent, "Export Encrypted Archive"))
+                                    val chooser = Intent.createChooser(sendIntent, "Export Encrypted Archive").apply {
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    context.startActivity(chooser)
                                 }
                                 .onFailure { error ->
                                     archiveError = error.message ?: "Could not create encrypted archive."
@@ -225,7 +237,11 @@ fun SettingsScreen(
                         listenerEnabled
                     )
                     OutlinedButton(
-                        onClick = { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) },
+                        onClick = {
+                            runCatching {
+                                context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                     ) { Text("Review notification access") }
 
@@ -644,6 +660,21 @@ fun SettingsScreen(
                             Spacer(Modifier.width(6.dp))
                             Text("Delete $unwantedCount unwanted old messages")
                         }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = {
+                            runCatching {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://prem736raj.github.io/NotiFlow/privacy-policy"))
+                                context.startActivity(intent)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                    ) {
+                        Icon(Icons.Outlined.PrivacyTip, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Privacy Policy")
                     }
                 }
             }

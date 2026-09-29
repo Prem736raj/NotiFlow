@@ -1,6 +1,7 @@
 package com.premraj.notiflow.ui
 
 import android.app.Application
+import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.lifecycle.AndroidViewModel
@@ -366,6 +367,18 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
         val allNotifications = graph.store.allItems()
         return withContext(Dispatchers.Default) {
             BackupExporter.createEncryptedBackup(
+                notifications = allNotifications,
+                preferences = graph.preferences,
+                password = password
+            )
+        }
+    }
+
+    suspend fun createEncryptedArchiveFile(context: Context, password: String): File {
+        val allNotifications = graph.store.allItems()
+        return withContext(Dispatchers.IO) {
+            BackupExporter.createEncryptedBackupFile(
+                context = context,
                 notifications = allNotifications,
                 preferences = graph.preferences,
                 password = password

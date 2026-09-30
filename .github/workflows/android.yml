@@ -42,8 +42,8 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
-      - name: Verify debug build
-        run: ./gradlew testDebugUnitTest lintDebug assembleDebug --stacktrace
+      - name: Verify build and release bundle
+        run: ./gradlew testDebugUnitTest lintDebug assembleDebug bundleRelease --stacktrace
 
   instrumented:
     runs-on: ubuntu-24.04

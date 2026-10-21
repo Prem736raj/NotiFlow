@@ -122,7 +122,6 @@
         <li><strong>Search & Reminders:</strong> Allowing you to query your past notifications and set reminders with approximate background delivery via Android WorkManager.</li>
         <li><strong>Optional OTP Clipboard Copying:</strong> When explicitly enabled by you in Settings, detecting OTP codes and copying them to your device clipboard with sensitive flag hints.</li>
         <li><strong>Optional Expense Tracking:</strong> When explicitly enabled by you in Settings, extracting transactional expense records for your personal financial dashboard.</li>
-        <li><strong>Hands-Free Voice Reader:</strong> When enabled by you, announcing eligible alerts via on-device Text-to-Speech (excluding OTPs) when headphones are connected.</li>
     </ul>
 
     <h2>3. On-Device Storage & Security</h2>
@@ -131,6 +130,7 @@
         <li><strong>Android Sandboxing:</strong> Access to the database is restricted to the NotiFlow application sandbox.</li>
         <li><strong>No Cloud Backup:</strong> System cloud backup (<code>android:allowBackup="false"</code>) is disabled to ensure notification data is not mirrored to external cloud backups.</li>
         <li><strong>Password-Protected Archives:</strong> When you choose to export your history, the archive is encrypted on-device using authenticated AES-GCM with a PBKDF2-derived key based on your personal passphrase. Archives are shared securely via Android's FileProvider.</li>
+        <li><strong>Optional App Lock:</strong> You can require your device's existing screen lock before opening NotiFlow. The app does not store a separate PIN or password.</li>
     </ul>
 
     <h2>4. No Cloud AI & No Automatic Model Downloads</h2>

@@ -3,7 +3,6 @@ package com.premraj.notiflow.ui
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -57,6 +56,7 @@ import androidx.core.content.ContextCompat
 @Composable
 fun OnboardingScreen(
     listenerEnabled: Boolean,
+    onOpenPrivacy: () -> Unit,
     onComplete: () -> Unit
 ) {
     val context = LocalContext.current
@@ -116,14 +116,7 @@ fun OnboardingScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(6.dp))
-                    TextButton(
-                        onClick = {
-                            runCatching {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://prem736raj.github.io/NotiFlow/privacy-policy/"))
-                                context.startActivity(intent)
-                            }
-                        }
-                    ) {
+                    TextButton(onClick = onOpenPrivacy) {
                         Text("Read full Privacy Policy")
                     }
                 }

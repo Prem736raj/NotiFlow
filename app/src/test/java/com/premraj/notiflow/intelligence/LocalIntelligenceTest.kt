@@ -168,42 +168,6 @@ class LocalIntelligenceTest {
     }
 
     @Test
-    fun aiRefinementUsesAmbiguityInsteadOfConfidenceThreshold() {
-        val fallback = LocalIntelligence.classify(
-            packageName = "com.discord",
-            title = "Order update",
-            body = "Your package shipped and is arriving tomorrow",
-            sender = "Store"
-        )
-
-        assertTrue(
-            LocalIntelligence.shouldRefineWithAi(
-                packageName = "com.discord",
-                title = "Order update",
-                body = "Your package shipped and is arriving tomorrow",
-                sender = "Store",
-                fallback = fallback
-            )
-        )
-
-        val payment = LocalIntelligence.classify(
-            packageName = "com.example.bank",
-            title = "Debit alert",
-            body = "Rs. 500 debited from your account",
-            sender = null
-        )
-        assertFalse(
-            LocalIntelligence.shouldRefineWithAi(
-                packageName = "com.example.bank",
-                title = "Debit alert",
-                body = "Rs. 500 debited from your account",
-                sender = null,
-                fallback = payment
-            )
-        )
-    }
-
-    @Test
     fun vipPriorityIsAnEffectiveOverlay() {
         val item = NotificationItem(
             id = 2L,

@@ -39,10 +39,18 @@ fun NotiFlowApp(
     var screen by rememberSaveable { mutableStateOf(AppScreen.HOME.name) }
     var section by rememberSaveable { mutableStateOf(HomeSection.NOW.name) }
     var detailId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var privacyOpen by rememberSaveable { mutableStateOf(false) }
 
     val listenerEnabled = rememberNotificationListenerState(context)
     @Suppress("UNUSED_VARIABLE") val recomposePrefs = prefVersion
     val onboardingComplete = viewModel.preferences.onboardingComplete
+
+    BackHandler(enabled = privacyOpen) { privacyOpen = false }
+
+    if (privacyOpen) {
+        PrivacyScreen(onBack = { privacyOpen = false })
+        return
+    }
 
     LaunchedEffect(requestedNotificationId, requestedDigest, notifications, initialLoadComplete) {
         when {
@@ -67,6 +75,7 @@ fun NotiFlowApp(
     if (!onboardingComplete) {
         OnboardingScreen(
             listenerEnabled = listenerEnabled,
+            onOpenPrivacy = { privacyOpen = true },
             onComplete = viewModel::completeOnboarding
         )
         return
@@ -118,6 +127,7 @@ fun NotiFlowApp(
         AppScreen.SETTINGS -> SettingsScreen(
             viewModel = viewModel,
             listenerEnabled = listenerEnabled,
+            onOpenPrivacy = { privacyOpen = true },
             onBack = { screen = AppScreen.HOME.name }
         )
         AppScreen.DETAIL -> {
@@ -130,6 +140,7 @@ fun NotiFlowApp(
                 DetailScreen(
                     item = item,
                     hideSensitive = viewModel.preferences.hideSensitivePreviews,
+                    autoCopyOtp = viewModel.preferences.autoCopyOtp,
                     onBack = { screen = AppScreen.HOME.name },
                     onStateChange = { viewModel.setState(item.id, it) },
                     onSetReminder = { viewModel.setReminder(item.id, it) },

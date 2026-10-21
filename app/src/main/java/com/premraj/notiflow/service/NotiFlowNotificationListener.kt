@@ -208,46 +208,14 @@ class NotiFlowNotificationListener : NotificationListenerService() {
             handleAutoCopyOtp(otpCode, appName, id)
         }
 
-        val refined = if (
-            LocalIntelligence.shouldRefineWithAi(
-                packageName = sbn.packageName,
-                title = title,
-                body = body,
-                sender = sender,
-                fallback = initial
-            )
-        ) {
-            graph.gemma.refine(
-                appName = appName,
-                title = title,
-                body = body,
-                fallback = initial
-            )
-        } else {
-            null
-        }
-
-        if (refined != null) {
-            val personalized = applyPersonalization(
-                refined,
-                sbn.packageName,
-                sender
-            )
-
-            graph.store.updateClassification(id, personalized)
-        }
-
         val stored = graph.store.get(id) ?: return
         _lastCapturedTimestamp.value = System.currentTimeMillis()
         runCatching {
             MetricsTracker.recordEvent(this, MetricsTracker.EVENT_CAPTURE_VERIFIED)
         }
 
-        graph.voiceReader.speak(stored)
-
         val quietBySource = sbn.packageName in graph.preferences.quietPackages()
         val quietByCategory = stored.category in graph.preferences.quietCategories()
-        val focusStatus = graph.focusEngine.currentStatus()
 
         val sensitiveByDeterministicRules =
             otpCode != null ||
@@ -258,13 +226,7 @@ class NotiFlowNotificationListener : NotificationListenerService() {
             !sensitiveByDeterministicRules &&
             LocalIntelligence.isSafeLowValueForSuppression(stored)
 
-        // Record suppressed metric for active focus mode without destroying the source notification
-        if (focusStatus.isActive && safeToSuppress) {
-            graph.focusEngine.recordSuppressed()
-        }
-
-        // Destructive status-bar cancellation is disabled for heuristic Focus Mode.
-        // Never destroy source notifications from the Android status bar based on heuristic classification.
+        // Never destroy source notifications based on heuristic classification.
         // Only explicit user-configured quiet sources or categories are cancelled.
         val quietWouldSuppress = (quietBySource || quietByCategory) && safeToSuppress
         if (quietWouldSuppress) {

@@ -46,7 +46,7 @@ User-initiated export/share actions intentionally send data to a destination cho
 
 ## Local AI
 
-Local AI activation is currently unavailable in the production UI while model identity, format, integrity, license, storage, and runtime compatibility are being production-verified. NotiFlow does not automatically download an AI model.
+NotiFlow does not ship, download, or run a generative AI model. An earlier inactive model path was removed from the production source. Classification uses deterministic on-device rules.
 
 If local AI is introduced later, this policy and the in-app disclosure must be updated before release if data handling changes.
 
@@ -63,12 +63,6 @@ NotiFlow's own auto-copy confirmation notification does not repeat the OTP value
 Expense parsing is off until the user explicitly enables it. When enabled, supported notifications can be parsed locally into derived transaction rows.
 
 Turning the feature off stops parsing future notifications. Existing derived rows remain on the device until the user deletes local history. Derived transaction data is inferred from notifications and should not be treated as an authoritative bank/accounting record.
-
-## Voice Reader
-
-If the user enables the Voice Reader, eligible notification content can be spoken by Android Text-to-Speech according to the configured routing/filter policy. OTPs are excluded by the current policy.
-
-Physical-device routing differs across wired, Bluetooth, USB, speaker, call-state, and OEM configurations; release claims must stay within device-tested behavior.
 
 ## Reminders and digests
 
@@ -94,7 +88,7 @@ Before release, all deletion paths must be device/integration-tested for notific
 
 Backup export requires a user-provided passphrase; NotiFlow does not use a universal built-in backup password.
 
-The current version-1 archive does not implement full notification-history restore. It must not be presented as a complete backup/restore system until staged validation and transactional restore are implemented and tested.
+The current version-3 archive includes notification fields and VIP rules. Restore is transactional and skips duplicate notification keys; reminder schedules are not recreated. Derived expense rows are exported separately as CSV and are not included in the encrypted archive.
 
 ## Data sharing and sale
 
@@ -108,7 +102,7 @@ The current product is not designed or validated as a child-directed service. If
 
 ## Security
 
-Security measures currently include Android application sandboxing, disabled Android app backup, private components for the notification listener/receivers, immutable PendingIntents where used, sensitive clipboard marking where supported, guarded destructive notification cancellation, and authenticated AES-GCM for password-protected export.
+Security measures currently include Android application sandboxing, disabled Android app backup, private components for the notification listener/receivers, immutable PendingIntents where used, sensitive clipboard marking where supported, guarded destructive notification cancellation, optional device-credential app lock, and authenticated AES-GCM for password-protected export.
 
 No security mechanism eliminates all risk. Device compromise, root access, screen/notification exposure, clipboard behavior, and user-initiated sharing can affect confidentiality.
 

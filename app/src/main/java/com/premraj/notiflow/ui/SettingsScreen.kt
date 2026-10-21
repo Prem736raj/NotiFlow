@@ -1,11 +1,11 @@
 package com.premraj.notiflow.ui
 
 import android.Manifest
+import android.app.KeyguardManager
 import android.app.TimePickerDialog
 import android.content.ClipData
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
@@ -14,7 +14,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -34,12 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.VolumeOff
-import androidx.compose.material.icons.automirrored.outlined.VolumeUp
-import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.DirectionsCar
-import androidx.compose.material.icons.outlined.DoNotDisturbOn
-import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PrivacyTip
@@ -80,7 +74,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -88,12 +81,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.premraj.notiflow.data.AppThemeMode
-import com.premraj.notiflow.data.FocusProfileType
 import com.premraj.notiflow.data.NotificationCategory
-import com.premraj.notiflow.data.VoiceReaderFilter
-import com.premraj.notiflow.data.VoiceReadingDetail
-import com.premraj.notiflow.data.VoiceTriggerCondition
-import com.premraj.notiflow.intelligence.ModelDownloadStatus
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -102,18 +90,17 @@ import java.util.Locale
 fun SettingsScreen(
     viewModel: NotiFlowViewModel,
     listenerEnabled: Boolean,
+    onOpenPrivacy: () -> Unit,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
     val observedApps by viewModel.observedApps.collectAsStateWithLifecycle()
     val storage by viewModel.storageStats.collectAsStateWithLifecycle()
-    val unwantedCount by viewModel.unwantedCount.collectAsStateWithLifecycle()
     val prefVersion by viewModel.preferencesVersion.collectAsStateWithLifecycle()
-    val isHeadphonesConnected by viewModel.isHeadphonesConnected.collectAsStateWithLifecycle()
-    val downloadStatus by viewModel.modelDownloadStatus.collectAsStateWithLifecycle()
     val isServiceConnected by NotiFlowNotificationListener.isServiceConnected.collectAsStateWithLifecycle()
     val lastCapturedTimestamp by NotiFlowNotificationListener.lastCapturedTimestamp.collectAsStateWithLifecycle()
     val prefs = viewModel.preferences
+    val deviceSecure = context.getSystemService(KeyguardManager::class.java)?.isDeviceSecure == true
     val scope = rememberCoroutineScope()
 
     var rebindStatusMessage by remember { mutableStateOf<String?>(null) }
@@ -123,6 +110,27 @@ fun SettingsScreen(
     var backupPassphrase by remember { mutableStateOf("") }
     var archiveCreating by remember { mutableStateOf(false) }
     var archiveError by remember { mutableStateOf<String?>(null) }
+    var restoreDialog by remember { mutableStateOf(false) }
+    var restoreUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var restorePassphrase by remember { mutableStateOf("") }
+    var restoring by remember { mutableStateOf(false) }
+    var restoreError by remember { mutableStateOf<String?>(null) }
+    var restoreMessage by remember { mutableStateOf<String?>(null) }
+
+    val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+            restoreUri = uri
+            restorePassphrase = ""
+            restoreError = null
+            restoreDialog = true
+        }
+    }
     var postGranted by remember(prefVersion) {
         mutableStateOf(
             Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
@@ -215,6 +223,69 @@ fun SettingsScreen(
                         backupDialog = false
                         backupPassphrase = ""
                         archiveError = null
+                    }
+                ) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (restoreDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                if (restoring) return@AlertDialog
+                restoreDialog = false
+                restorePassphrase = ""
+                restoreError = null
+            },
+            title = { Text("Restore encrypted archive") },
+            text = {
+                Column {
+                    Text("Enter the passphrase used when this archive was exported. Existing history is kept and duplicate notification keys are skipped. Reminder schedules are not recreated.")
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = restorePassphrase,
+                        onValueChange = { restorePassphrase = it },
+                        label = { Text("Archive passphrase") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    restoreError?.let {
+                        Spacer(Modifier.height(8.dp))
+                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = restorePassphrase.isNotBlank() && !restoring,
+                    onClick = {
+                        val uri = restoreUri ?: return@TextButton
+                        val password = restorePassphrase
+                        restoring = true
+                        restoreError = null
+                        scope.launch {
+                            runCatching {
+                                viewModel.restoreEncryptedArchive(context, uri, password)
+                            }.onSuccess { summary ->
+                                restorePassphrase = ""
+                                restoreDialog = false
+                                restoreMessage = "Restored ${summary.notificationsImported} notifications and ${summary.vipRulesImported} VIP rules."
+                            }.onFailure { error ->
+                                restoreError = error.message ?: "Could not restore this archive."
+                            }
+                            restoring = false
+                        }
+                    }
+                ) { Text(if (restoring) "Restoring…" else "Restore") }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !restoring,
+                    onClick = {
+                        restoreDialog = false
+                        restorePassphrase = ""
+                        restoreError = null
                     }
                 ) { Text("Cancel") }
             }
@@ -356,64 +427,6 @@ fun SettingsScreen(
             }
 
             item {
-                val templates = remember(prefVersion) { viewModel.getAvailableTemplates() }
-                SettingsCard(Icons.Outlined.AutoAwesome, "Smart Presets & Templates") {
-                    Text(
-                        "Opt into opinionated, privacy-first notification workflows. Every preset includes clear explainability and fail-safe defaults.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    templates.forEach { template ->
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                            ),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Column(Modifier.padding(14.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(Modifier.weight(1f)) {
-                                        Text(
-                                            text = template.title,
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                        Spacer(Modifier.height(2.dp))
-                                        Text(
-                                            text = template.subtitle,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                    Spacer(Modifier.width(8.dp))
-                                    Switch(
-                                        checked = template.isEnabled,
-                                        onCheckedChange = { checked ->
-                                            viewModel.applyTemplate(template.id, checked)
-                                        }
-                                    )
-                                }
-                                Spacer(Modifier.height(6.dp))
-                                Text(
-                                    text = template.details,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.outline
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            item {
                 SettingsCard(Icons.Outlined.Palette, "Appearance & Theme") {
                     Text(
                         "Choose how NotiFlow itself should look. Device wallpaper colors are optional so the app keeps a consistent identity by default.",
@@ -441,153 +454,6 @@ fun SettingsScreen(
                         checked = prefs.useDynamicColors,
                         onChecked = viewModel::setUseDynamicColors
                     )
-                }
-            }
-
-            item {
-                val focusStatus = remember(prefVersion) { viewModel.getFocusStatus() }
-
-                SettingsCard(Icons.Outlined.DoNotDisturbOn, "Context Focus Mode") {
-                    Text(
-                        "Manual and scheduled focus profiles suppress only confidently identified low-value promotions, spam, and social noise. VIP, pinned, OTP, payment, High, and Normal priority notifications are never suppressed by Focus Mode.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(10.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = if (focusStatus.isActive) "Focus active: ${focusStatus.activeProfile?.label ?: "Manual"}" else "Focus inactive",
-                                fontWeight = FontWeight.Bold,
-                                color = if (focusStatus.isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = if (focusStatus.isActive) "Focus profile active · ${focusStatus.blockedCount} low-value alert${if (focusStatus.blockedCount == 1) "" else "s"} suppressed" else "Normal notification flow",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        Button(
-                            onClick = {
-                                if (focusStatus.isActive) {
-                                    viewModel.stopActiveFocus()
-                                } else {
-                                    viewModel.toggleManualFocus(FocusProfileType.WORK)
-                                }
-                            },
-                            colors = if (focusStatus.isActive) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                            else ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                        ) {
-                            Text(if (focusStatus.isActive) "Turn off" else "Start work focus")
-                        }
-                    }
-
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-
-                    SettingSwitch(
-                        title = "Sleep schedule profile (11 PM - 7 AM)",
-                        subtitle = "Opt in to conservative low-value suppression during this schedule.",
-                        checked = prefs.sleepFocusScheduled,
-                        onChecked = viewModel::setSleepFocusScheduled
-                    )
-
-                    SettingSwitch(
-                        title = "Work hours profile (Mon-Fri, 9 AM - 5 PM)",
-                        subtitle = "Opt in to conservative low-value suppression during office hours.",
-                        checked = prefs.workFocusScheduled,
-                        onChecked = viewModel::setWorkFocusScheduled
-                    )
-                }
-            }
-
-            item {
-                SettingsCard(Icons.Outlined.Headphones, "Hands-Free Voice Reader") {
-                    SettingSwitch(
-                        title = "Hands-free voice reader",
-                        subtitle = "Speaks notifications aloud using on-device Text-to-Speech when earphones are plugged in or Bluetooth headset is connected.",
-                        checked = prefs.voiceReaderEnabled,
-                        onChecked = viewModel::setVoiceReaderEnabled
-                    )
-
-                    SettingSwitch(
-                        title = "Manual driving mode",
-                        subtitle = "When you turn this on, driving-or-headphones rules may allow announcements. NotiFlow does not detect driving automatically.",
-                        checked = prefs.drivingModeActive,
-                        onChecked = viewModel::setDrivingModeActive
-                    )
-
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Icon(
-                                if (isHeadphonesConnected) Icons.Outlined.Headphones else Icons.AutoMirrored.Outlined.VolumeUp,
-                                contentDescription = null,
-                                tint = if (isHeadphonesConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Text(
-                                text = if (isHeadphonesConnected) "Headphones / Bluetooth connected" else "No earphones connected",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-
-                    Text("When to announce", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(VoiceTriggerCondition.entries) { condition ->
-                            FilterChip(
-                                selected = prefs.voiceTriggerCondition == condition,
-                                onClick = { viewModel.setVoiceTriggerCondition(condition) },
-                                label = { Text(condition.label) }
-                            )
-                        }
-                    }
-
-                    Text("What to announce", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(VoiceReaderFilter.entries) { filter ->
-                            FilterChip(
-                                selected = prefs.voiceReaderFilter == filter,
-                                onClick = { viewModel.setVoiceReaderFilter(filter) },
-                                label = { Text(filter.label) }
-                            )
-                        }
-                    }
-
-                    Text("Announcement detail", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(VoiceReadingDetail.entries) { detail ->
-                            FilterChip(
-                                selected = prefs.voiceReadingDetail == detail,
-                                onClick = { viewModel.setVoiceReadingDetail(detail) },
-                                label = { Text(detail.label) }
-                            )
-                        }
-                    }
-
-                    OutlinedButton(
-                        onClick = { viewModel.testVoiceAnnouncement() },
-                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
-                    ) {
-                        Text("Test voice announcement")
-                    }
                 }
             }
 
@@ -687,71 +553,23 @@ fun SettingsScreen(
             }
 
             item {
-                SettingsCard(Icons.Outlined.AutoAwesome, "Smart classification") {
-                    Text(
-                        "Rules-only classification is active. Local AI activation is unavailable until NotiFlow has a verified model identity, integrity check, and production-ready import/acquisition flow.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(8.dp))
-
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 10.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            when (downloadStatus) {
-                                ModelDownloadStatus.READY -> {
-                                    Text(
-                                        "Local model file detected",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Spacer(Modifier.height(4.dp))
-                                    Text(
-                                        "If model initialization or inference fails, NotiFlow falls back to deterministic on-device rules.",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                else -> {
-                                    Text(
-                                        "Rules-only mode",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Spacer(Modifier.height(4.dp))
-                                    Text(
-                                        "No local model is configured. Automatic network model acquisition is disabled until model identity, integrity, consent, and compatibility are production-verified.",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Text(
-                        "Notification text is processed locally. There is no cloud inference fallback in NotiFlow's classifier.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
-            }
-
-            item {
                 SettingsCard(Icons.Outlined.PrivacyTip, "Privacy & retention") {
                     SettingSwitch(
                         title = "Auto-copy verification codes",
                         subtitle = "Automatically copy OTPs to clipboard when notifications arrive.",
                         checked = prefs.autoCopyOtp,
                         onChecked = viewModel::setAutoCopyOtp
+                    )
+                    SettingSwitch(
+                        title = "App lock",
+                        subtitle = if (deviceSecure) {
+                            "Require your device screen lock whenever you return to NotiFlow."
+                        } else {
+                            "Set a device screen lock first, then enable app lock here."
+                        },
+                        checked = prefs.appLockEnabled,
+                        enabled = deviceSecure,
+                        onChecked = viewModel::setAppLockEnabled
                     )
                     Text(
                         "Captured notification history remains available after a source notification disappears. Android removal callbacks do not reliably prove that a sender used “Delete for everyone”.",
@@ -794,35 +612,9 @@ fun SettingsScreen(
                         ) { Text("Clean old history now") }
                     }
 
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-
-                    SettingSwitch(
-                        title = "15-day unwanted message alert",
-                        subtitle = "Notify every 15-20 days to delete old recharge, promotion & spam messages with 1 tap.",
-                        checked = prefs.unwantedCleanupPromptEnabled,
-                        onChecked = viewModel::setUnwantedPromptEnabled
-                    )
-
-                    if (unwantedCount > 0) {
-                        Button(
-                            onClick = { viewModel.deleteUnwantedMessages() },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-                        ) {
-                            Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Delete $unwantedCount unwanted old messages")
-                        }
-                    }
-
                     Spacer(Modifier.height(8.dp))
                     OutlinedButton(
-                        onClick = {
-                            runCatching {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://prem736raj.github.io/NotiFlow/privacy-policy/"))
-                                context.startActivity(intent)
-                            }
-                        },
+                        onClick = onOpenPrivacy,
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                     ) {
                         Icon(Icons.Outlined.PrivacyTip, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -882,6 +674,24 @@ fun SettingsScreen(
 
                     Spacer(Modifier.height(10.dp))
 
+                    OutlinedButton(
+                        onClick = { restoreLauncher.launch(arrayOf("*/*")) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Restore encrypted archive")
+                    }
+
+                    restoreMessage?.let {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    Spacer(Modifier.height(10.dp))
+
                     OutlinedButton(onClick = { clearConfirm = true }, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Outlined.Delete, contentDescription = null)
                         Text(" Delete all NotiFlow history")
@@ -929,6 +739,7 @@ private fun SettingSwitch(
     title: String,
     subtitle: String,
     checked: Boolean,
+    enabled: Boolean = true,
     onChecked: (Boolean) -> Unit
 ) {
     Row(
@@ -939,7 +750,7 @@ private fun SettingSwitch(
             Text(title, fontWeight = FontWeight.Medium)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Switch(checked = checked, onCheckedChange = onChecked)
+        Switch(checked = checked, onCheckedChange = onChecked, enabled = enabled)
     }
 }
 

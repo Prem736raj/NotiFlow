@@ -3,8 +3,15 @@ package com.premraj.notiflow.util
 import com.premraj.notiflow.data.ExpenseCategory
 import com.premraj.notiflow.data.ExpenseTransaction
 import com.premraj.notiflow.data.TransactionType
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import javax.crypto.Cipher
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.PBEKeySpec
+import javax.crypto.spec.SecretKeySpec
 
 class BackupExporterTest {
 
@@ -77,7 +84,7 @@ class BackupExporterTest {
             postedAt = 1727300000000L,
             updatedAt = 1727300000000L,
             removedAt = null,
-            isActiveOnSystem = false,
+            isActiveOnSystem = true,
             category = com.premraj.notiflow.data.NotificationCategory.OTP,
             priority = com.premraj.notiflow.data.NotificationPriority.HIGH,
             confidence = 0.99f,
@@ -104,15 +111,24 @@ class BackupExporterTest {
         val result = BackupExporter.decryptBackup(encryptedPayload, password)
         assertTrue(result.isSuccess)
         val json = result.getOrThrow()
-        org.junit.Assert.assertEquals(2, json.getInt("version"))
-        org.junit.Assert.assertEquals("notiflow-archive-v2", json.getString("format"))
+        org.junit.Assert.assertEquals(3, json.getInt("version"))
+        org.junit.Assert.assertEquals("notiflow-archive-v3", json.getString("format"))
 
         val notifs = json.getJSONArray("notifications")
         org.junit.Assert.assertEquals(1, notifs.length())
         val notifObj = notifs.getJSONObject(0)
         org.junit.Assert.assertEquals(42L, notifObj.getLong("id"))
+        org.junit.Assert.assertEquals("test_key", notifObj.getString("notification_key"))
         org.junit.Assert.assertEquals("Secret Alert", notifObj.getString("title"))
         org.junit.Assert.assertEquals("OTP", notifObj.getString("category"))
+        org.junit.Assert.assertTrue(notifObj.getBoolean("is_active"))
+
+        val restored = BackupExporter.notificationItemsFromArchive(json)
+        org.junit.Assert.assertEquals(1, restored.size)
+        org.junit.Assert.assertEquals("test_key", restored.single().notificationKey)
+        org.junit.Assert.assertEquals(true, restored.single().read)
+        org.junit.Assert.assertFalse(restored.single().isActiveOnSystem)
+        org.junit.Assert.assertTrue(BackupExporter.vipRulesFromArchive(json).contains("com.important.app|"))
 
         val vips = json.getJSONArray("vip_rules")
         org.junit.Assert.assertEquals(2, vips.length())
@@ -131,6 +147,27 @@ class BackupExporterTest {
             thrown = true
         }
         assertTrue("Short passphrase must be rejected", thrown)
+    }
+
+    @Test
+    fun testDecryptsLegacyEnvelopeWithoutHeader() {
+        val salt = ByteArray(16) { it.toByte() }
+        val iv = ByteArray(12) { it.toByte() }
+        val plainText = """{"version":3,"format":"notiflow-archive-v3","notifications":[],"vip_rules":[]}"""
+
+        val keySpec = PBEKeySpec("LegacyPassword123".toCharArray(), salt, 10_000, 256)
+        val keyFactory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+        val secretKey = SecretKeySpec(keyFactory.generateSecret(keySpec).encoded, "AES")
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey, GCMParameterSpec(128, iv))
+        val cipherText = cipher.doFinal(plainText.toByteArray(Charsets.UTF_8))
+
+        val combined = salt + iv + cipherText
+        val payload = Base64Compat.encodeToString(combined)
+
+        val result = BackupExporter.decryptBackup(payload, "LegacyPassword123")
+        assertTrue(result.isSuccess)
+        assertEquals(3, result.getOrThrow().getInt("version"))
     }
 
     @Test

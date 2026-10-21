@@ -48,7 +48,6 @@ object DiagnosticsExporter {
         autoCleanupEnabled: Boolean,
         retentionDays: Int,
         digestEnabled: Boolean,
-        localAiEnabled: Boolean,
         eventCounts: Map<String, Long>,
         nowTimestamp: Long = System.currentTimeMillis()
     ): JSONObject {
@@ -96,7 +95,6 @@ object DiagnosticsExporter {
                 put("learned_rules_count", learnedCount)
                 put("quiet_packages_count", quietPackagesCount)
                 put("quiet_categories_count", quietCategoriesCount)
-                put("local_ai_enabled", localAiEnabled)
             })
 
             put("event_funnel_counters", JSONObject().apply {
@@ -135,7 +133,6 @@ object DiagnosticsExporter {
             autoCleanupEnabled = graph.preferences.autoCleanupEnabled,
             retentionDays = graph.preferences.retentionDays,
             digestEnabled = graph.preferences.digestEnabled,
-            localAiEnabled = graph.preferences.localAiEnabled,
             eventCounts = eventCounts
         )
 

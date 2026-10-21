@@ -51,17 +51,9 @@ class DigestWorker(
             .take(4)
             .joinToString(", ") { "${it.value} ${shortLabel(it.key)}" }
             .ifBlank { "${lowValue.size} notifications" }
-        val fallback = buildString {
+        val summary = buildString {
             append(structured.replaceFirstChar { it.uppercase() })
             if (important.isNotEmpty()) append(". ${important.size} important item${if (important.size == 1) "" else "s"} also arrived.")
-        }
-        val summary = if (graph.preferences.hideSensitivePreviews) {
-            fallback
-        } else {
-            graph.gemma.summarize(
-                lowValue.take(24).map { "${it.appName}: ${it.displayTitle} — ${it.displayBody}" },
-                fallback
-            )
         }
 
         val openIntent = Intent(applicationContext, MainActivity::class.java).apply {

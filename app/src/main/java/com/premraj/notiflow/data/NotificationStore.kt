@@ -307,47 +307,47 @@ class NotificationStore(context: Context) {
         }
     }
 
-    suspend fun countRemovedBySource(): Int = withContext(Dispatchers.IO) {
-        helper.readableDatabase.rawQuery(
-            "SELECT COUNT(*) FROM $TABLE WHERE is_removed_by_source = 1",
-            null
-        ).use { cursor ->
-            if (cursor.moveToFirst()) cursor.getInt(0) else 0
-        }
-    }
-
-    suspend fun countUnwantedOldMessages(days: Int = 15): Int = withContext(Dispatchers.IO) {
-        val cutoff = System.currentTimeMillis() - days * 86_400_000L
-        val cursor = helper.readableDatabase.rawQuery(
-            """
-            SELECT COUNT(*) FROM $TABLE
-            WHERE posted_at < ?
-              AND pinned = 0
-              AND is_vip = 0
-              AND remind_at IS NULL
-              AND category IN ('${NotificationCategory.PROMOTION.name}', '${NotificationCategory.SPAM.name}')
-            """.trimIndent(),
-            arrayOf(cutoff.toString())
-        )
-        cursor.use { if (it.moveToFirst()) it.getInt(0) else 0 }
-    }
-
-    suspend fun deleteUnwantedOldMessages(days: Int = 15): Int = withContext(Dispatchers.IO) {
+    suspend fun importNotifications(items: List<NotificationItem>): Int = withContext(Dispatchers.IO) {
         mutationMutex.withLock {
-            val cutoff = System.currentTimeMillis() - days * 86_400_000L
-            val count = helper.writableDatabase.delete(
-                TABLE,
-                """
-                posted_at < ?
-                  AND pinned = 0
-                  AND is_vip = 0
-                  AND remind_at IS NULL
-                  AND category IN ('${NotificationCategory.PROMOTION.name}', '${NotificationCategory.SPAM.name}')
-                """.trimIndent(),
-                arrayOf(cutoff.toString())
-            )
+            val db = helper.writableDatabase
+            var imported = 0
+            db.beginTransaction()
+            try {
+                items.forEach { item ->
+                    val values = ContentValues().apply {
+                        put("notification_key", item.notificationKey)
+                        put("package_name", item.packageName)
+                        put("app_name", item.appName)
+                        putNullable("title", item.title)
+                        putNullable("body", item.body)
+                        putNullable("sender", item.sender)
+                        put("posted_at", item.postedAt)
+                        put("updated_at", item.updatedAt)
+                        item.removedAt?.let { put("removed_at", it) } ?: putNull("removed_at")
+                        put("is_active", if (item.isActiveOnSystem) 1 else 0)
+                        put("category", item.category.name)
+                        put("priority", item.priority.name)
+                        put("confidence", item.confidence)
+                        put("category_overridden", if (item.categoryOverridden) 1 else 0)
+                        put("priority_overridden", if (item.priorityOverridden) 1 else 0)
+                        put("state", item.state.name)
+                        item.remindAt?.let { put("remind_at", it) } ?: putNull("remind_at")
+                        put("pinned", if (item.pinned) 1 else 0)
+                        put("is_vip", if (item.isVip) 1 else 0)
+                        put("read", if (item.read) 1 else 0)
+                        item.amountHint?.let { put("amount_hint", it) } ?: putNull("amount_hint")
+                        put("is_removed_by_source", if (item.isRemovedBySource) 1 else 0)
+                    }
+                    if (db.insertWithOnConflict(TABLE, null, values, SQLiteDatabase.CONFLICT_IGNORE) != -1L) {
+                        imported++
+                    }
+                }
+                db.setTransactionSuccessful()
+            } finally {
+                db.endTransaction()
+            }
             refreshFromDb()
-            count
+            imported
         }
     }
 

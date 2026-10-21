@@ -128,8 +128,7 @@ dependencies {
 
     implementation("androidx.work:work-runtime-ktx:2.12.0")
 
-    // MediaPipe tasks-genai native dependency removed to reduce APK download size from ~69 MB to ~15 MB.
-    // GemmaClassifier provides a clean offline rules-first fallback stub.
+    // Classification is deterministic and on-device. No generative-model runtime is packaged.
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")

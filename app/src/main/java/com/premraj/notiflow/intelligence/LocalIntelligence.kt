@@ -13,7 +13,6 @@ object LocalIntelligence {
     )
     private val paymentRegex = Regex("(?i)\\b(?:debited|credited|transaction|payment|upi|bank|account|card|paid|refund|balance|emi|autopay|mandate)\\b")
     private val paymentAlertRegex = Regex("(?i)\\b(?:declined|failed|fraud|suspicious|blocked|unauthori[sz]ed|overdue|due today)\\b")
-    private val explicitTransactionRegex = Regex("(?i)\\b(?:debited|credited|upi (?:payment|transaction)|card (?:payment|transaction)|refund (?:received|processed))\\b")
     private val deliveryRegex = Regex("(?i)\\b(?:delivery|delivered|out for delivery|shipped|shipment|order|courier|package|tracking|dispatch|arriving)\\b")
     private val messageRegex = Regex("(?i)\\b(?:message|replied|sent you|mentioned you|dm|chat|whatsapp|telegram|signal)\\b")
     private val workRegex = Regex("(?i)\\b(?:meeting|assignment|deadline|class|lecture|exam|project|task|github|jira|slack|teams|workspace|school|college|university)\\b")
@@ -63,37 +62,6 @@ object LocalIntelligence {
             amountHint = amount,
             reason = "Fast on-device rules"
         )
-    }
-
-    fun shouldRefineWithAi(
-        packageName: String,
-        title: String?,
-        body: String?,
-        sender: String?,
-        fallback: ClassificationResult
-    ): Boolean {
-        val text = semanticText(title, body, sender)
-        if (fallback.category == NotificationCategory.OTP || explicitTransactionRegex.containsMatchIn(text)) return false
-        if (fallback.category == NotificationCategory.OTHER || fallback.confidence < 0.65f) return true
-
-        val semanticCategories = buildSet {
-            if (paymentRegex.containsMatchIn(text)) add(NotificationCategory.PAYMENT)
-            if (deliveryRegex.containsMatchIn(text)) add(NotificationCategory.DELIVERY)
-            if (workRegex.containsMatchIn(text)) add(NotificationCategory.WORK_STUDY)
-            if (reminderRegex.containsMatchIn(text)) add(NotificationCategory.REMINDER_EVENT)
-            if (promotionRegex.containsMatchIn(text)) add(NotificationCategory.PROMOTION)
-            if (spamRegex.containsMatchIn(text)) add(NotificationCategory.SPAM)
-            if (messageRegex.containsMatchIn(text)) add(NotificationCategory.MESSAGE)
-            if (socialRegex.containsMatchIn(text)) add(NotificationCategory.SOCIAL)
-        }
-        if (semanticCategories.size > 1) return true
-
-        val packageCategory = when {
-            looksLikeMessagingPackage(packageName) -> NotificationCategory.MESSAGE
-            looksLikeSocialPackage(packageName) -> NotificationCategory.SOCIAL
-            else -> null
-        }
-        return packageCategory != null && semanticCategories.isNotEmpty() && packageCategory !in semanticCategories
     }
 
     fun effectivePriority(item: NotificationItem, now: Long = System.currentTimeMillis()): NotificationPriority {

@@ -14,9 +14,6 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.NotiFlow">
 
-        <uses-native-library android:name="libvndksupport.so" android:required="false" />
-        <uses-native-library android:name="libOpenCL.so" android:required="false" />
-
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -35,14 +32,6 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
-
-        <receiver
-            android:name=".receiver.DeleteUnwantedReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.premraj.notiflow.ACTION_DELETE_UNWANTED" />
-            </intent-filter>
-        </receiver>
 
         <provider
             android:name="androidx.core.content.FileProvider"

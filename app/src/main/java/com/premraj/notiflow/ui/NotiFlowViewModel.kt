@@ -12,8 +12,6 @@ import com.premraj.notiflow.data.ExpenseCategory
 import com.premraj.notiflow.data.ExpenseSummary
 import com.premraj.notiflow.data.ExpenseTimeRange
 import com.premraj.notiflow.data.ExpenseTransaction
-import com.premraj.notiflow.data.FocusProfileType
-import com.premraj.notiflow.data.FocusStatus
 import com.premraj.notiflow.data.InsightsTimeRange
 import com.premraj.notiflow.data.LearnedPreference
 import com.premraj.notiflow.data.MetricsTracker
@@ -23,12 +21,8 @@ import com.premraj.notiflow.data.NotificationItem
 import com.premraj.notiflow.data.NotificationPriority
 import com.premraj.notiflow.data.NotificationState
 import com.premraj.notiflow.data.TransactionType
-import com.premraj.notiflow.data.VoiceReaderFilter
-import com.premraj.notiflow.data.VoiceReadingDetail
-import com.premraj.notiflow.data.VoiceTriggerCondition
 import com.premraj.notiflow.intelligence.InsightsAnalyzer
 import com.premraj.notiflow.intelligence.LocalIntelligence
-import com.premraj.notiflow.intelligence.ModelDownloadStatus
 import com.premraj.notiflow.util.BackupExporter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,6 +33,11 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Calendar
 
+data class RestoreSummary(
+    val notificationsImported: Int,
+    val vipRulesImported: Int
+)
+
 class NotiFlowViewModel(application: Application) : AndroidViewModel(application) {
     private val graph = application.appGraph
     val notifications: StateFlow<List<NotificationItem>> = graph.store.items
@@ -48,33 +47,30 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
     private val _preferencesVersion = MutableStateFlow(0)
     val preferencesVersion: StateFlow<Int> = _preferencesVersion.asStateFlow()
 
+    private val _isUnlocked = MutableStateFlow(false)
+    val isUnlocked: StateFlow<Boolean> = _isUnlocked.asStateFlow()
+
+    fun unlock() {
+        _isUnlocked.value = true
+    }
+
+    fun lock() {
+        _isUnlocked.value = false
+    }
+
     private val _observedApps = MutableStateFlow<List<Pair<String, String>>>(emptyList())
     val observedApps: StateFlow<List<Pair<String, String>>> = _observedApps.asStateFlow()
 
     private val _storageStats = MutableStateFlow(0 to 0L)
     val storageStats: StateFlow<Pair<Int, Long>> = _storageStats.asStateFlow()
 
-    private val _unwantedCount = MutableStateFlow(0)
-    val unwantedCount: StateFlow<Int> = _unwantedCount.asStateFlow()
-
-    val modelDownloadStatus: StateFlow<ModelDownloadStatus> = graph.modelDownloader.status
-    val modelDownloadProgress: StateFlow<Float> = graph.modelDownloader.progress
-    val isHeadphonesConnected: StateFlow<Boolean> = graph.voiceReader.isHeadphonesConnected
-
     val preferences get() = graph.preferences
-    val modelAvailable get() = graph.gemma.isModelAvailable
 
     init {
         refreshObservedApps()
         refreshStorageStats()
-        refreshUnwantedCount()
         viewModelScope.launch {
             graph.store.synchronizeVipFlags(graph.preferences.vipRules())
-        }
-        viewModelScope.launch {
-            notifications.collect {
-                refreshUnwantedCount()
-            }
         }
     }
 
@@ -162,15 +158,6 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
         graph.store.deleteExpenseByNotificationId(notificationId)
     }
 
-    fun getAvailableTemplates(): List<com.premraj.notiflow.data.NotificationTemplate> {
-        return com.premraj.notiflow.data.NotificationTemplates.getAvailableTemplates(graph.preferences)
-    }
-
-    fun applyTemplate(templateId: String, enable: Boolean) {
-        com.premraj.notiflow.data.NotificationTemplates.applyTemplate(graph.preferences, templateId, enable)
-        bumpPrefs()
-    }
-
     fun setDigestEnabled(enabled: Boolean) {
         graph.preferences.digestEnabled = enabled
         if (enabled) {
@@ -212,11 +199,6 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
 
     fun setAutoCopyOtp(enabled: Boolean) {
         graph.preferences.autoCopyOtp = enabled
-        bumpPrefs()
-    }
-
-    fun setAntiRevokeEnabled(enabled: Boolean) {
-        graph.preferences.antiRevokeEnabled = enabled
         bumpPrefs()
     }
 
@@ -292,89 +274,6 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
         bumpPrefs()
     }
 
-    fun setUnwantedPromptEnabled(enabled: Boolean) {
-        graph.preferences.unwantedCleanupPromptEnabled = enabled
-        bumpPrefs()
-    }
-
-    fun deleteUnwantedMessages() = viewModelScope.launch {
-        val days = graph.preferences.unwantedCleanupDays
-        graph.store.deleteUnwantedOldMessages(days)
-        refreshStorageStats()
-        refreshUnwantedCount()
-    }
-
-    fun refreshUnwantedCount() = viewModelScope.launch {
-        val days = graph.preferences.unwantedCleanupDays
-        _unwantedCount.value = graph.store.countUnwantedOldMessages(days)
-    }
-
-    fun setLocalAiEnabled(enabled: Boolean) {
-        graph.preferences.localAiEnabled = enabled
-        if (!enabled) viewModelScope.launch { graph.gemma.reset() }
-        bumpPrefs()
-    }
-
-    fun retryModelDownload() {
-        graph.modelDownloader.autoStartDownloadIfNeeded()
-    }
-
-    fun setVoiceReaderEnabled(enabled: Boolean) {
-        graph.preferences.voiceReaderEnabled = enabled
-        bumpPrefs()
-    }
-
-    fun setDrivingModeActive(active: Boolean) {
-        graph.preferences.drivingModeActive = active
-        bumpPrefs()
-    }
-
-    fun setVoiceTriggerCondition(condition: VoiceTriggerCondition) {
-        graph.preferences.voiceTriggerCondition = condition
-        bumpPrefs()
-    }
-
-    fun setVoiceReaderFilter(filter: VoiceReaderFilter) {
-        graph.preferences.voiceReaderFilter = filter
-        bumpPrefs()
-    }
-
-    fun setVoiceReadingDetail(detail: VoiceReadingDetail) {
-        graph.preferences.voiceReadingDetail = detail
-        bumpPrefs()
-    }
-
-    fun setVoiceSpeechRate(rate: Float) {
-        graph.preferences.voiceSpeechRate = rate
-        bumpPrefs()
-    }
-
-    fun testVoiceAnnouncement() {
-        graph.voiceReader.testAnnouncement()
-    }
-
-    fun getFocusStatus(): FocusStatus = graph.focusEngine.currentStatus()
-
-    fun toggleManualFocus(type: FocusProfileType = FocusProfileType.WORK) {
-        graph.focusEngine.toggleManualFocus(type)
-        bumpPrefs()
-    }
-
-    fun stopActiveFocus() {
-        graph.focusEngine.stopActiveFocus()
-        bumpPrefs()
-    }
-
-    fun setSleepFocusScheduled(scheduled: Boolean) {
-        graph.preferences.sleepFocusScheduled = scheduled
-        bumpPrefs()
-    }
-
-    fun setWorkFocusScheduled(scheduled: Boolean) {
-        graph.preferences.workFocusScheduled = scheduled
-        bumpPrefs()
-    }
-
     fun setAppThemeMode(mode: AppThemeMode) {
         graph.preferences.appThemeMode = mode
         bumpPrefs()
@@ -382,6 +281,11 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
 
     fun setUseDynamicColors(enabled: Boolean) {
         graph.preferences.useDynamicColors = enabled
+        bumpPrefs()
+    }
+
+    fun setAppLockEnabled(enabled: Boolean) {
+        graph.preferences.appLockEnabled = enabled
         bumpPrefs()
     }
 
@@ -407,6 +311,35 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
             )
         }
     }
+
+    suspend fun restoreEncryptedArchive(context: Context, uri: Uri, password: String): RestoreSummary =
+        withContext(Dispatchers.IO) {
+            val payload = context.contentResolver.openInputStream(uri)?.use { stream ->
+                stream.bufferedReader(Charsets.UTF_8).readText()
+            } ?: throw BackupExporter.CorruptArchiveException("Could not read the selected archive")
+
+            val root = BackupExporter.decryptBackup(payload, password).getOrThrow()
+            val notifications = BackupExporter.notificationItemsFromArchive(root)
+            val imported = graph.store.importNotifications(notifications)
+
+            val before = graph.preferences.vipRules()
+            val archiveRules = BackupExporter.vipRulesFromArchive(root)
+            archiveRules.forEach { token ->
+                val packageName = token.substringBefore('|')
+                if (packageName.isNotBlank()) {
+                    val sender = token.substringAfter('|', "").takeIf { it.isNotBlank() }
+                    graph.preferences.setVip(packageName, sender, true)
+                }
+            }
+
+            _observedApps.value = graph.store.observedApps()
+            _storageStats.value = graph.store.storageStats()
+            bumpPrefs()
+            RestoreSummary(
+                notificationsImported = imported,
+                vipRulesImported = (graph.preferences.vipRules() - before).size
+            )
+        }
 
     fun refreshObservedApps() = viewModelScope.launch {
         _observedApps.value = graph.store.observedApps()

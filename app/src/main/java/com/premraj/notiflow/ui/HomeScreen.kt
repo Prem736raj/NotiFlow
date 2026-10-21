@@ -121,8 +121,7 @@ fun HomeScreen(
     }.sortedByDescending { it.postedAt }
     val historyItems = notifications.filter {
         it.state == NotificationState.DONE || it.state == NotificationState.ARCHIVED ||
-            (!it.isActiveOnSystem && it.state == NotificationState.ACTIVE && !it.pinned &&
-                LocalIntelligence.effectivePriority(it) != NotificationPriority.LOW)
+            (!it.isActiveOnSystem && it.state == NotificationState.ACTIVE && !it.pinned)
     }.sortedByDescending { it.updatedAt }
     val deletedItems = notifications.filter { it.isRemovedBySource }.sortedByDescending { it.updatedAt }
 
@@ -170,7 +169,7 @@ fun HomeScreen(
                                 HomeSection.NOW -> "Important alerts needing attention"
                                 HomeSection.LATER -> "Follow-up queue & scheduled reminders"
                                 HomeSection.DIGEST -> "Low-priority noise, contained"
-                                HomeSection.HISTORY -> "Everything: all notifications & history"
+                                HomeSection.HISTORY -> "Completed, archived, and past alerts"
                                 HomeSection.DELETED -> "Removed by source apps, preserved in NotiFlow"
                                 HomeSection.EXPENSES -> "100% offline bank & UPI spending tracker"
                                 HomeSection.INSIGHTS -> "Notification activity & distraction insights"
@@ -262,7 +261,7 @@ fun HomeScreen(
                                         color = if (dark) Color(0xFFFEF3C7) else Color(0xFF78350F)
                                     )
                                     Text(
-                                        "Enable permission so NotiFlow can triage and auto-copy incoming OTPs.",
+                                        "Enable permission so NotiFlow can triage and preserve incoming notifications.",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = if (dark) Color(0xFFFCD34D) else Color(0xFF92400E)
                                     )
@@ -314,7 +313,7 @@ fun HomeScreen(
                     }
                     item {
                         SectionChip(
-                            label = "Everything",
+                            label = "History",
                             count = historyItems.size,
                             icon = Icons.Outlined.History,
                             isSelected = selectedSection == HomeSection.HISTORY,
@@ -370,16 +369,6 @@ fun HomeScreen(
                             onClick = { onSectionChange(HomeSection.INSIGHTS) }
                         )
                     }
-                    item {
-                        SectionChip(
-                            label = "Deleted",
-                            count = deletedItems.size,
-                            icon = Icons.Outlined.Security,
-                            isSelected = selectedSection == HomeSection.DELETED,
-                            secondary = true,
-                            onClick = { onSectionChange(HomeSection.DELETED) }
-                        )
-                    }
                 }
             }
 
@@ -421,7 +410,7 @@ fun HomeScreen(
                         )
                         HomeSection.HISTORY -> Triple(
                             "History is clear",
-                            "Completed, archived, and past system notifications remain reviewable here.",
+                            "Completed, archived, dismissed, and source-removed alerts remain reviewable here.",
                             Icons.Outlined.History
                         )
                         HomeSection.DELETED -> Triple(

@@ -14,20 +14,20 @@
 
 **Launch decision:** Do not submit the currently generated release AAB to a production track. Complete the P0 gates, then run a real-device beta before expanding acquisition.
 
-**Implementation progress (21 October 2026, local changes pending commit):** The release-signing debug fallback was removed, a signing prerequisite added to release packaging, CI configured to build with a short-lived test-only certificate, the public-only Pages workflow added, and privacy links normalized to the intended `/privacy-policy/` URL. These are source changes awaiting final validation, commit and deployment. Production upload credentials, a publicly reachable hosted policy, the Play Console review, and physical-device sign-off remain incomplete; see [release preparation](RELEASE_PREPARATION.md).
+**Implementation progress (22 October 2026, local changes pending commit):** The release-signing debug fallback was removed, a signing prerequisite added to release packaging, CI configured to build with a short-lived test-only certificate, and the public-only Pages workflow added. The inactive local AI/model, Focus Mode, Smart Presets, voice reader, unwanted-cleanup prompt, and anti-revoke toggle were removed; the policy is embedded in-app; encrypted archive restore and device-credential app lock were added. Production upload credentials, a publicly reachable hosted policy, the Play Console review, and physical-device sign-off remain incomplete; see [release preparation](RELEASE_PREPARATION.md).
 
 ### Evidence and confidence
 
 | Signal | Finding | Confidence / limitation |
 | --- | --- | --- |
 | Kotlin/Compose project | Material 3, minSdk 24, targetSdk 37, local SQLite and WorkManager | Source inspected |
-| Features | Notification listener, history, priority scoring, search, Later, reminders, digests, VIP/focus rules, exclusion/masking, optional expense parsing, voice reader, encrypted export | Source present; device behavior not comprehensively validated |
-| Checks | testDebugUnitTest, lintDebug, bundleRelease completed successfully; 76 tests, 0 failures, 0 skipped across 11 suites | Prior run on this checkout, 21 October 2026 |
-| AAB | app/build/outputs/bundle/release/app-release.aab, 6,401,184 bytes (approximately 6.4 MB bundle) | Built artifact inspected; this is not per-device download/install size |
-| Release signing | AAB signing certificate subject CN=Android Debug | Confirmed via keytool inspection; unacceptable as the intended production upload identity |
+| Features | Notification listener, history, priority scoring, search, Later, reminders, digests, VIP/quiet rules, exclusion/masking, optional expense parsing, encrypted export/restore, optional app lock | Source present; device behavior not comprehensively validated |
+| Checks | testDebugUnitTest, lintDebug, assembleDebug completed successfully; 75 tests, 0 failures, 0 skipped across 12 suites | Local run on 22 October 2026 |
+| AAB | The checked-in 6.4 MB release AAB predates the explicit signing prerequisite and must be rebuilt with an upload key | Local artifact inspected; not Play-ready |
+| Release signing | Release packaging now fails without an explicit non-debug upload keystore | Source verified locally; production key still required |
 | Privacy URL | In-app URL https://prem736raj.github.io/NotiFlow/privacy-policy returns 404; Pages site root, directory and .html variants also return 404 | HTTP checks on 21 October 2026; policy HTML exists in the repository but is not published at these URLs |
 | Google Pages API | Unauthenticated public /repos/Prem736raj/NotiFlow/pages request returns 404 | Does not by itself prove the repository's Pages setting; independently confirms deployment/configuration needs owner verification |
-| Generative AI | GemmaClassifier currently returns unavailable/fallback; ModelDownloader does not download a production model | Source inspected; no functioning model-backed summarization/classification |
+| Generative AI | The local model path was removed; classification and digest summaries are deterministic and on-device | Source inspected; no generative-model runtime is packaged |
 | Device quality | Pixel/Google, Samsung/One UI and Xiaomi/HyperOS reliability; battery; notification listener recovery; reminder timeliness | **Unknown until physical-device tests** |
 | Market | Google Play competitor listings and official competitor site consulted | Public listing claims, not independent side-by-side device benchmarks |
 
@@ -125,7 +125,7 @@ The policy URL shown here is the intended directory route; it is **currently bro
 
 ## 6. AI investment gate (after reliable baseline; usually month 3+)
 
-The repository currently ships a **rules-first experience**. GemmaClassifier is a fallback stub, and there is no operational production model download. Do not use "generative AI powered" in the listing yet.
+The repository currently ships a **rules-first experience** and packages no generative-model runtime. Do not use "generative AI powered" in the listing. Treat any future model work as a separately gated project.
 
 Run a simple comparative evaluation of **rules only** vs a candidate **small on-device model** on redacted, consented examples: relevance/priority accuracy, OTP protection, transaction false positives, median/p95 inference time, battery drain, RAM peak, total model download size, license, supported ABI, model integrity and offline fallback. For model download, use a clear explicit consent/download screen and checksum verification. Keep the rule classifier available on all devices.
 
@@ -241,6 +241,6 @@ Research checked on 21 October 2026. External listings and policies change; re-o
 - [Google Play: Testing requirements for new personal developer accounts](https://support.google.com/googleplay/android-developer/answer/14151465)
 - [Google Play: Android vitals](https://support.google.com/googleplay/android-developer/answer/9844486)
 - [Android: NotificationListenerService and requestRebind](https://developer.android.com/reference/android/service/notification/NotificationListenerService)
-- Local technical evidence: app/build.gradle.kts; app/src/main/AndroidManifest.xml; app/src/main/java/com/premraj/notiflow/intelligence/GemmaClassifier.kt; app/src/main/java/com/premraj/notiflow/util/BackupExporter.kt; docs/PLAY_DATA_SAFETY_NOTES.md; docs/PHASE_STATUS.md; AUDIT_FINDINGS.md.
+- Local technical evidence: app/build.gradle.kts; app/src/main/AndroidManifest.xml; app/src/main/java/com/premraj/notiflow/intelligence/LocalIntelligence.kt; app/src/main/java/com/premraj/notiflow/util/BackupExporter.kt; docs/PLAY_DATA_SAFETY_NOTES.md; docs/PHASE_STATUS.md; AUDIT_FINDINGS.md.
 
 **Do not interpret competitor descriptions or developer self-reported Play Data Safety labels as independent verification of their implementation.** NotiFlow device stability, live retention and actual store conversion remain unknown until measured.

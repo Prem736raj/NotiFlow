@@ -12,29 +12,30 @@ NotiFlow is an Android notification inbox focused on local-first notification hi
 - Persistent SQLite notification history with update-by-notification-key behavior.
 - Rules-first local classification; the core path does not require cloud AI.
 - Pin, state, reminder, VIP, learned preference, search, digest, cleanup, and expense-domain code exists.
+- The privacy policy is embedded in the app and works offline; no external URL is required.
 - Group-summary and ongoing/foreground-service notifications are filtered before persistence.
 - Quiet-source/category cancellation is restricted to final, high-confidence low-priority promotion/spam/social classifications and protects VIP, pinned, OTP, and payment signals.
 - OTP clipboard content is marked sensitive on supported Android versions, and OTP auto-copy is opt-in.
 - Android app backup is disabled with `android:allowBackup="false"`.
+- Optional app lock delegates to the device screen lock; NotiFlow stores no separate PIN or password.
+- Encrypted archive export can be restored into local notification history and VIP rules with duplicate-key protection; reminder schedules are not recreated.
 - Gradle wrapper files are committed.
 
 ### Partial or intentionally constrained
 
-- **Focus profiles:** manual and scheduled status are implemented, but focus-based notification suppression is intentionally not enforced until its policy is device-tested.
-- **Local AI:** `GemmaClassifier` is currently a fallback stub. No model inference runtime is packaged. Automatic network model download is disabled, so rules-only mode is the actual shipped implementation.
-- **Encrypted archive export:** the current v1 export is password-protected and intended for data portability/reference. There is no full notification-history restore path or restore UI yet.
-- **Anti-revoke:** NotiFlow preserves captured notification history after a source notification disappears; it does **not** claim to prove a sender used “Delete for everyone.”
-- **Voice reader:** incoming notifications are wired to the TTS policy engine, but real routing/OEM/device behavior still requires physical-device verification.
+- **Encrypted archive export:** v3 archives are password-protected and include notification fields plus VIP rules. Restore is available in Settings and skips duplicate notification keys; derived expense rows are not included in the archive.
+- **Removed surface area:** the non-functional local AI/model path, Focus Mode, Smart Presets, voice reader, unwanted-cleanup prompt, and anti-revoke toggle have been deleted from the app rather than left as misleading toggles.
 
 ## Privacy model
 
-Notification content is stored locally in the app database. The current classifier has no cloud-inference fallback. Optional local AI is disabled unless the user explicitly enables it, and no automatic model network acquisition occurs.
+Notification content is stored locally in the app database. Classification uses deterministic on-device rules; there is no cloud inference fallback and no model download path. The privacy policy is available offline inside the app.
 
 Sensitive controls are opt-in where they create additional derived/exposed data:
 
 - OTP auto-copy: off until explicit user consent.
 - Expense parsing: off until explicit user consent.
-- Local AI: off until explicit user consent.
+- Automatic cleanup and scheduled digest: off by default.
+- Sensitive previews: hidden by default.
 
 Turning expense parsing off stops new derived financial rows; existing derived rows remain until the user deletes local history.
 
@@ -67,21 +68,11 @@ From a machine with the Android SDK configured:
 ./gradlew assembleDebug
 ```
 
-The repository also contains `.github/workflows/android.yml`, which requests unit tests, lint, a debug build, a release bundle, and instrumented Android tests. A generated release bundle is not necessarily production-ready: the current release-signing configuration falls back to an Android Debug key without explicit production credentials.
+The repository also contains `.github/workflows/android.yml`, which requests unit tests, lint, a debug build, a release bundle, and instrumented Android tests. Release packaging fails unless `KEYSTORE_PATH`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, and `KEY_PASSWORD` are explicitly configured; debug builds do not require them.
 
 ## Device verification still required
 
-NotificationListenerService behavior, notification cancellation, clipboard presentation, TTS routing, WorkManager/OEM scheduling, reboot/rebind behavior, MediaPipe inference, and lock-screen behavior require physical-device coverage. At minimum test Android 13, 14, 15, 16, and the newest supported release across AOSP/Pixel plus major OEMs where available.
-
-## Local AI runtime note
-
-Google's MediaPipe LLM Inference Android guide documents `com.google.mediapipe:tasks-genai:0.10.27`, but describes the API as maintenance-only and recommends LiteRT-LM for new work. **NotiFlow's current app/build.gradle.kts does not include that inference dependency.** Model format/identity must be verified against the eventual runtime before enabling acquisition; NotiFlow does not auto-download a model.
-
-Official references:
-
-- https://developers.google.com/edge/mediapipe/solutions/genai/llm_inference/android
-- https://developers.google.com/edge/mediapipe/solutions/genai/llm_inference
-- https://developers.google.com/edge/litert-lm/android
+NotificationListenerService behavior, notification cancellation, clipboard presentation, WorkManager/OEM scheduling, reboot/rebind behavior, and lock-screen behavior require physical-device coverage. At minimum test Android 13, 14, 15, 16, and the newest supported release across AOSP/Pixel plus major OEMs where available.
 
 ## Audit
 

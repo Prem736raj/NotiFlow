@@ -1,5 +1,9 @@
 # NotiFlow Production Hardening Audit
 
+> Historical ledger. The inactive local AI/model, Focus Mode, Smart Presets, voice reader, unwanted-cleanup prompt, and anti-revoke toggle described below were removed from the current source. Archive restore, safe defaults, and device-credential app lock have since been implemented. Treat this file as audit history, not a current feature list.
+>
+> Current-state corrections (2026-10-22): GitHub Pages is not currently enabled, so release-gate/scorecard references to a live privacy URL are historical and the policy is embedded in-app; encrypted archive restore is implemented for v3 archives; native library declarations for the removed generative-model runtime are gone.
+
 Audit branch: `astra/notiflow-production-hardening`  
 Baseline branch: `main`  
 Baseline SHA: `0f19c68269055abefc5de6a0cfa613d057c175b9`  

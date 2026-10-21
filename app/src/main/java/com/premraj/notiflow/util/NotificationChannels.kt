@@ -9,7 +9,6 @@ object NotificationChannels {
     const val REMINDERS = "reminders"
     const val DIGESTS = "digests"
     const val OTP_ALERTS = "otp_alerts"
-    const val CLEANUP_ALERTS = "cleanup_alerts"
 
     fun create(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -37,13 +36,6 @@ object NotificationChannels {
                 ).apply {
                     description = "Instant confirmation when an OTP is automatically copied to your clipboard"
                     lockscreenVisibility = android.app.Notification.VISIBILITY_PRIVATE
-                },
-                NotificationChannel(
-                    CLEANUP_ALERTS,
-                    "Unwanted message cleanup prompts",
-                    NotificationManager.IMPORTANCE_DEFAULT
-                ).apply {
-                    description = "Periodic prompts to delete old unwanted recharge and promo messages"
                 }
             )
         )

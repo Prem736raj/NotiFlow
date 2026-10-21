@@ -12,8 +12,7 @@ Google Play defines “collected” for Data Safety as data transmitted off the 
 | OTP content | stored as part of notification history; optional clipboard copy | verify no SDK/transmission path; clipboard is on-device |
 | financial/payment notification content | local notification storage | sensitive financial information; must not be publicly exposed |
 | derived expense data | created locally only after explicit opt-in | verify final release has no transmission/export except user action |
-| local AI prompt text | local MediaPipe path only; activation UI disabled | verify final SDK/runtime build has no telemetry/network behavior |
-| backup/export | encrypted text shared only after user action | user-initiated transfer destination must be clear |
+| backup/export | encrypted text shared or restored only after user action | user-initiated transfer destination must be clear |
 | reminders/digests | posted locally through Android | notification previews require privacy testing |
 | app/package identity | used locally for source/exclusion/classification | inspect all SDKs for off-device package inventory behavior |
 | analytics/ads | none intentionally integrated in current app dependencies reviewed | verify transitive/release APK before answering “No” |
@@ -31,7 +30,7 @@ Before completing the Play Data Safety form:
 1. inspect the merged release manifest;
 2. inspect final release dependencies and Play SDK Index entries;
 3. search final code/resources for analytics, advertising, telemetry, crash upload, HTTP clients, and unexpected INTERNET permission;
-4. inspect MediaPipe/LiteRT runtime behavior used by the actual release;
+4. confirm the release contains no model runtime or model files;
 5. exercise all network calls on a clean physical device;
 6. verify user-initiated export destinations are the only intentional off-device path for notification content;
 7. update the privacy policy and Data Safety form together.

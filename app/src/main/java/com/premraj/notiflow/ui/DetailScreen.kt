@@ -99,6 +99,7 @@ import java.util.Date
 fun DetailScreen(
     item: NotificationItem,
     hideSensitive: Boolean,
+    autoCopyOtp: Boolean,
     onBack: () -> Unit,
     onStateChange: (NotificationState) -> Unit,
     onSetReminder: (Long?) -> Unit,
@@ -239,7 +240,11 @@ fun DetailScreen(
                             Spacer(Modifier.height(6.dp))
 
                             Text(
-                                text = "✓ Automatically copied to clipboard on arrival",
+                                text = if (autoCopyOtp) {
+                                    "✓ Auto-copy is on. Tap below if the code is not in your clipboard."
+                                } else {
+                                    "Auto-copy is off. Tap below to copy this code."
+                                },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (dark) Color(0xFF6EE7B7).copy(alpha = 0.85f) else Color(0xFF047857)
                             )
@@ -256,7 +261,7 @@ fun DetailScreen(
                             ) {
                                 Icon(Icons.Outlined.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text("Re-Copy Code", fontWeight = FontWeight.Bold)
+                                Text(if (autoCopyOtp) "Re-Copy Code" else "Copy Code", fontWeight = FontWeight.Bold)
                             }
                         }
                     }

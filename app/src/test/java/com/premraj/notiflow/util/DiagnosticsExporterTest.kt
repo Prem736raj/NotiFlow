@@ -41,7 +41,6 @@ class DiagnosticsExporterTest {
             autoCleanupEnabled = true,
             retentionDays = 30,
             digestEnabled = true,
-            localAiEnabled = false,
             eventCounts = eventCounts,
             nowTimestamp = 1729512000000L
         )
@@ -82,7 +81,6 @@ class DiagnosticsExporterTest {
         assertEquals(4, config.getInt("learned_rules_count"))
         assertEquals(2, config.getInt("quiet_packages_count"))
         assertEquals(1, config.getInt("quiet_categories_count"))
-        assertFalse(config.getBoolean("local_ai_enabled"))
     }
 
     @Test
@@ -104,7 +102,6 @@ class DiagnosticsExporterTest {
             autoCleanupEnabled = false,
             retentionDays = 7,
             digestEnabled = false,
-            localAiEnabled = false,
             eventCounts = eventCounts
         )
 
@@ -162,7 +159,6 @@ class DiagnosticsExporterTest {
             autoCleanupEnabled = false,
             retentionDays = 7,
             digestEnabled = false,
-            localAiEnabled = false,
             eventCounts = counts
         )
 
@@ -191,7 +187,6 @@ class DiagnosticsExporterTest {
             autoCleanupEnabled = false,
             retentionDays = 7,
             digestEnabled = false,
-            localAiEnabled = false,
             eventCounts = emptyMap()
         )
 

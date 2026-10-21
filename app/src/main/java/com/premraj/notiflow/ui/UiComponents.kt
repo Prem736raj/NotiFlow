@@ -649,7 +649,7 @@ fun copyOtpToClipboard(context: Context, code: String) {
         }
     }
     clipboard.setPrimaryClip(clip)
-    Toast.makeText(context, "OTP $code copied to clipboard", Toast.LENGTH_SHORT).show()
+    Toast.makeText(context, "Verification code copied to clipboard", Toast.LENGTH_SHORT).show()
 }
 
 fun visibleBody(item: NotificationItem, hideSensitive: Boolean): String {

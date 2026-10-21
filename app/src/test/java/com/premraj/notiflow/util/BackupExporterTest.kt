@@ -104,7 +104,8 @@ class BackupExporterTest {
         val result = BackupExporter.decryptBackup(encryptedPayload, password)
         assertTrue(result.isSuccess)
         val json = result.getOrThrow()
-        org.junit.Assert.assertEquals(1, json.getInt("version"))
+        org.junit.Assert.assertEquals(2, json.getInt("version"))
+        org.junit.Assert.assertEquals("notiflow-archive-v2", json.getString("format"))
 
         val notifs = json.getJSONArray("notifications")
         org.junit.Assert.assertEquals(1, notifs.length())
@@ -118,6 +119,21 @@ class BackupExporterTest {
     }
 
     @Test
+    fun testWeakPasswordIsRejected() {
+        var thrown = false
+        try {
+            BackupExporter.createEncryptedBackup(
+                notifications = emptyList(),
+                vipRules = emptySet(),
+                password = "short"
+            )
+        } catch (_: BackupExporter.WeakPasswordException) {
+            thrown = true
+        }
+        assertTrue("Short passphrase must be rejected", thrown)
+    }
+
+    @Test
     fun testDecryptWithWrongPasswordFails() {
         val encryptedPayload = BackupExporter.createEncryptedBackup(
             notifications = emptyList(),
@@ -125,14 +141,16 @@ class BackupExporterTest {
             password = "CorrectPassword123"
         )
 
-        val result = BackupExporter.decryptBackup(encryptedPayload, "WrongPassword")
+        val result = BackupExporter.decryptBackup(encryptedPayload, "WrongPassword123")
         assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull() is BackupExporter.InvalidPasswordException)
     }
 
     @Test
     fun testDecryptWithCorruptedPayloadFails() {
-        val result = BackupExporter.decryptBackup("not-a-valid-base64-payload!!!", "anyPassword")
+        val result = BackupExporter.decryptBackup("not-a-valid-base64-payload!!!", "anyPassword123")
         assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull() is BackupExporter.CorruptArchiveException)
     }
 }
 

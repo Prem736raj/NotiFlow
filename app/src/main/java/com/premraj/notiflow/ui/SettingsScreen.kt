@@ -43,9 +43,15 @@ import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PrivacyTip
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Security
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Storage
+import com.premraj.notiflow.service.NotiFlowNotificationListener
+import com.premraj.notiflow.util.DiagnosticsExporter
+import java.text.SimpleDateFormat
+import java.util.Date
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -105,9 +111,13 @@ fun SettingsScreen(
     val prefVersion by viewModel.preferencesVersion.collectAsStateWithLifecycle()
     val isHeadphonesConnected by viewModel.isHeadphonesConnected.collectAsStateWithLifecycle()
     val downloadStatus by viewModel.modelDownloadStatus.collectAsStateWithLifecycle()
+    val isServiceConnected by NotiFlowNotificationListener.isServiceConnected.collectAsStateWithLifecycle()
+    val lastCapturedTimestamp by NotiFlowNotificationListener.lastCapturedTimestamp.collectAsStateWithLifecycle()
     val prefs = viewModel.preferences
     val scope = rememberCoroutineScope()
 
+    var rebindStatusMessage by remember { mutableStateOf<String?>(null) }
+    var exportingDiagnostics by remember { mutableStateOf(false) }
     var clearConfirm by remember { mutableStateOf(false) }
     var backupDialog by remember { mutableStateOf(false) }
     var backupPassphrase by remember { mutableStateOf("") }
@@ -256,6 +266,149 @@ fun SettingsScreen(
                             onClick = { postPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) },
                             modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                         ) { Text("Allow NotiFlow alerts") }
+                    }
+                }
+            }
+
+            item {
+                SettingsCard(Icons.Outlined.Security, "System & Capture Health") {
+                    val connectionStatusText = when {
+                        !listenerEnabled -> "Permission Revoked"
+                        isServiceConnected -> "Connected & Active"
+                        else -> "Disconnected (Standby)"
+                    }
+                    val connectionPositive = listenerEnabled && isServiceConnected
+
+                    SettingStatus(
+                        "Listener connection status",
+                        connectionStatusText,
+                        connectionPositive
+                    )
+
+                    Spacer(Modifier.height(10.dp))
+
+                    val lastCapturedText = remember(lastCapturedTimestamp) {
+                        formatCapturedTimestamp(lastCapturedTimestamp)
+                    }
+
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Last notification captured", fontWeight = FontWeight.Medium)
+                            Text(lastCapturedText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+
+                    Spacer(Modifier.height(10.dp))
+
+                    OutlinedButton(
+                        onClick = {
+                            val rebindRequested = NotiFlowNotificationListener.requestRebindSafely(context)
+                            rebindStatusMessage = if (rebindRequested) {
+                                "Service rebind requested."
+                            } else {
+                                "Rebind throttled (cooldown active). Toggle notification access if issues persist."
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Reconnect Service")
+                    }
+
+                    rebindStatusMessage?.let { msg ->
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = msg,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    Spacer(Modifier.height(10.dp))
+
+                    OutlinedButton(
+                        onClick = {
+                            exportingDiagnostics = true
+                            scope.launch {
+                                runCatching {
+                                    val file = DiagnosticsExporter.exportDiagnosticsToFile(context)
+                                    DiagnosticsExporter.shareDiagnostics(context, file)
+                                }
+                                exportingDiagnostics = false
+                            }
+                        },
+                        enabled = !exportingDiagnostics,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Outlined.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (exportingDiagnostics) "Generating report…" else "Export & Share Diagnostic Report (0% PII)")
+                    }
+
+                    Text(
+                        text = "Consent-based diagnostic report contains zero notification titles, message bodies, senders, or OTP codes. Strictly on-device health & error metadata.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+            }
+
+            item {
+                val templates = remember(prefVersion) { viewModel.getAvailableTemplates() }
+                SettingsCard(Icons.Outlined.AutoAwesome, "Smart Presets & Templates") {
+                    Text(
+                        "Opt into opinionated, privacy-first notification workflows. Every preset includes clear explainability and fail-safe defaults.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    templates.forEach { template ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Column(Modifier.padding(14.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(
+                                            text = template.title,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Spacer(Modifier.height(2.dp))
+                                        Text(
+                                            text = template.subtitle,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Spacer(Modifier.width(8.dp))
+                                    Switch(
+                                        checked = template.isEnabled,
+                                        onCheckedChange = { checked ->
+                                            viewModel.applyTemplate(template.id, checked)
+                                        }
+                                    )
+                                }
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    text = template.details,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -666,7 +819,7 @@ fun SettingsScreen(
                     OutlinedButton(
                         onClick = {
                             runCatching {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://prem736raj.github.io/NotiFlow/privacy-policy"))
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://prem736raj.github.io/NotiFlow/privacy-policy/"))
                                 context.startActivity(intent)
                             }
                         },
@@ -812,4 +965,9 @@ private fun formatBytes(bytes: Long): String = when {
     bytes >= 1024L * 1024 -> String.format(Locale.US, "%.1f MB", bytes / (1024.0 * 1024))
     bytes >= 1024L -> String.format(Locale.US, "%.1f KB", bytes / 1024.0)
     else -> "$bytes B"
+}
+
+private fun formatCapturedTimestamp(timestamp: Long): String {
+    if (timestamp <= 0L) return "No notifications captured in this session yet"
+    return SimpleDateFormat("MMM d, yyyy h:mm:ss a", Locale.US).format(Date(timestamp))
 }

@@ -275,6 +275,14 @@ class UserPreferences internal constructor(private val prefs: SharedPreferences)
         prefs.edit().clear().apply()
     }
 
+    fun isTemplateEnabled(templateId: String, default: Boolean = false): Boolean {
+        return prefs.getBoolean("template_enabled_$templateId", default)
+    }
+
+    fun setTemplateEnabled(templateId: String, enabled: Boolean) {
+        prefs.edit().putBoolean("template_enabled_$templateId", enabled).apply()
+    }
+
     private fun saveLearned(items: List<LearnedPreference>) {
         val arr = JSONArray()
         items.forEach { p ->

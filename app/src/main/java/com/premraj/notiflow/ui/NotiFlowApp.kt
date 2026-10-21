@@ -19,6 +19,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.premraj.notiflow.data.HomeSection
+import com.premraj.notiflow.data.MetricsTracker
 import com.premraj.notiflow.service.NotiFlowNotificationListener
 
 private enum class AppScreen { HOME, SEARCH, SETTINGS, DETAIL }
@@ -50,6 +51,7 @@ fun NotiFlowApp(
                     detailId = requestedNotificationId
                     screen = AppScreen.DETAIL.name
                     viewModel.markRead(requestedNotificationId)
+                    MetricsTracker.recordEvent(context, MetricsTracker.EVENT_NOTIFICATION_RETRIEVED)
                 }
                 onNavigationRequestConsumed()
             }
@@ -84,10 +86,15 @@ fun NotiFlowApp(
             hideSensitive = viewModel.preferences.hideSensitivePreviews,
             expenses = expenses,
             onGetExpenseSummary = viewModel::getExpenseSummary,
+            onToggleQuietPackage = viewModel::setQuietPackage,
+            onSetState = viewModel::setState,
+            onSetReminder = viewModel::setReminder,
+            onTogglePin = { viewModel.setPinned(it, !it.pinned) },
             onSectionChange = { section = it.name },
             onOpenNotification = {
                 detailId = it.id
                 viewModel.markRead(it.id)
+                MetricsTracker.recordEvent(context, MetricsTracker.EVENT_NOTIFICATION_RETRIEVED)
                 screen = AppScreen.DETAIL.name
             },
             onSearch = { screen = AppScreen.SEARCH.name },
@@ -104,6 +111,7 @@ fun NotiFlowApp(
             onOpenNotification = {
                 detailId = it.id
                 viewModel.markRead(it.id)
+                MetricsTracker.recordEvent(context, MetricsTracker.EVENT_NOTIFICATION_RETRIEVED)
                 screen = AppScreen.DETAIL.name
             }
         )
@@ -133,6 +141,9 @@ fun NotiFlowApp(
                         viewModel.delete(item.id)
                         screen = AppScreen.HOME.name
                     },
+                    onRemoveExpense = {
+                        viewModel.removeExpenseForNotification(item.id)
+                    },
                     onOpenOriginal = {
                         NotiFlowNotificationListener.openOriginal(
                             context = context,
@@ -148,13 +159,17 @@ fun NotiFlowApp(
 
 @Composable
 private fun rememberNotificationListenerState(context: Context): Boolean {
-    var enabled by remember { mutableStateOf(isNotificationListenerEnabled(context)) }
+    var enabled by remember { mutableStateOf(NotiFlowNotificationListener.isAccessGranted(context)) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                enabled = isNotificationListenerEnabled(context)
+                val newEnabled = NotiFlowNotificationListener.isAccessGranted(context)
+                if (enabled && !newEnabled) {
+                    MetricsTracker.recordEvent(context, MetricsTracker.EVENT_PERMISSION_REVOKED)
+                }
+                enabled = newEnabled
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -162,10 +177,4 @@ private fun rememberNotificationListenerState(context: Context): Boolean {
     }
 
     return enabled
-}
-
-private fun isNotificationListenerEnabled(context: Context): Boolean {
-    val flat = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners").orEmpty()
-    val expected = ComponentName(context, NotiFlowNotificationListener::class.java).flattenToString()
-    return flat.split(":").any { it.equals(expected, ignoreCase = true) }
 }

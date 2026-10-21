@@ -63,13 +63,21 @@ object ExpenseParser {
         }
 
         // Negative check: avoid payment due alerts/reminders being treated as completed transactions
-        if ((lowerText.contains("is due") || lowerText.contains("due on") || lowerText.contains("due by") || lowerText.contains("payment due")) &&
-            !lowerText.contains("debited") &&
-            !lowerText.contains("paid successfully") &&
-            !lowerText.contains("successful payment") &&
-            !lowerText.contains("deducted") &&
-            !lowerText.contains("spent")
-        ) {
+        val hasDueIndicator = lowerText.contains("due") ||
+                lowerText.contains("bill generated") ||
+                lowerText.contains("bill of") ||
+                lowerText.contains("payment reminder") ||
+                lowerText.contains("click to pay") ||
+                lowerText.contains("pay before") ||
+                lowerText.contains("pay now to avoid")
+
+        val hasActualDebitConfirmation = lowerText.contains("debited") ||
+                lowerText.contains("paid successfully") ||
+                lowerText.contains("successful payment") ||
+                lowerText.contains("deducted") ||
+                lowerText.contains("withdrawn")
+
+        if (hasDueIndicator && !hasActualDebitConfirmation) {
             return null
         }
 
@@ -120,7 +128,14 @@ object ExpenseParser {
     }
 
     private fun extractTransactionType(lowerText: String): TransactionType? {
-        val debitIndex = debitKeywords.map { lowerText.indexOf(it) }.filter { it >= 0 }.minOrNull() ?: Int.MAX_VALUE
+        val debitIndex = debitKeywords.map { kw ->
+            if (kw == "paid") {
+                // Ensure word boundary and not "postpaid" or "prepaid"
+                Regex("""(?<!post|pre)\bpaid\b""").find(lowerText)?.range?.first ?: -1
+            } else {
+                lowerText.indexOf(kw)
+            }
+        }.filter { it >= 0 }.minOrNull() ?: Int.MAX_VALUE
         val creditIndex = creditKeywords.map { lowerText.indexOf(it) }.filter { it >= 0 }.minOrNull() ?: Int.MAX_VALUE
 
         return when {

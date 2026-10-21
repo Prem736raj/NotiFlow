@@ -33,7 +33,7 @@ import androidx.compose.material.icons.outlined.NotificationsOff
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.ViewList
+import androidx.compose.material.icons.automirrored.outlined.ViewList
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -44,11 +44,18 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -87,6 +94,9 @@ fun HomeScreen(
         com.premraj.notiflow.intelligence.InsightsAnalyzer.computeInsights(notifications, it)
     },
     onToggleQuietPackage: (String, Boolean) -> Unit = { _, _ -> },
+    onSetState: (Long, NotificationState) -> Unit = { _, _ -> },
+    onSetReminder: (Long, Long?) -> Unit = { _, _ -> },
+    onTogglePin: (NotificationItem) -> Unit = {},
     onSectionChange: (HomeSection) -> Unit,
     onOpenNotification: (NotificationItem) -> Unit,
     onSearch: () -> Unit,
@@ -94,6 +104,8 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     val dark = LocalNotiFlowDarkTheme.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
 
     val nowItems = notifications.filter {
         it.state == NotificationState.ACTIVE &&
@@ -127,6 +139,7 @@ fun HomeScreen(
     val highPriorityCount = nowItems.count { LocalIntelligence.effectivePriority(it) == NotificationPriority.HIGH }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -154,10 +167,10 @@ fun HomeScreen(
                         }
                         Text(
                             text = when (selectedSection) {
-                                HomeSection.NOW -> "What deserves attention"
-                                HomeSection.LATER -> "Things you chose to revisit"
+                                HomeSection.NOW -> "Important alerts needing attention"
+                                HomeSection.LATER -> "Follow-up queue & scheduled reminders"
                                 HomeSection.DIGEST -> "Low-priority noise, contained"
-                                HomeSection.HISTORY -> "Done, archived and past alerts"
+                                HomeSection.HISTORY -> "Everything: all notifications & history"
                                 HomeSection.DELETED -> "Removed by source apps, preserved in NotiFlow"
                                 HomeSection.EXPENSES -> "100% offline bank & UPI spending tracker"
                                 HomeSection.INSIGHTS -> "Notification activity & distraction insights"
@@ -283,7 +296,7 @@ fun HomeScreen(
                 ) {
                     item {
                         SectionChip(
-                            label = "Now",
+                            label = "Important",
                             count = nowItems.size,
                             icon = Icons.Outlined.Notifications,
                             isSelected = selectedSection == HomeSection.NOW,
@@ -301,20 +314,20 @@ fun HomeScreen(
                     }
                     item {
                         SectionChip(
-                            label = "Digest",
-                            count = digestItems.size,
-                            icon = Icons.Outlined.ViewList,
-                            isSelected = selectedSection == HomeSection.DIGEST,
-                            onClick = { onSectionChange(HomeSection.DIGEST) }
-                        )
-                    }
-                    item {
-                        SectionChip(
-                            label = "History",
+                            label = "Everything",
                             count = historyItems.size,
                             icon = Icons.Outlined.History,
                             isSelected = selectedSection == HomeSection.HISTORY,
                             onClick = { onSectionChange(HomeSection.HISTORY) }
+                        )
+                    }
+                    item {
+                        SectionChip(
+                            label = "Digest",
+                            count = digestItems.size,
+                            icon = Icons.AutoMirrored.Outlined.ViewList,
+                            isSelected = selectedSection == HomeSection.DIGEST,
+                            onClick = { onSectionChange(HomeSection.DIGEST) }
                         )
                     }
                 }
@@ -357,17 +370,15 @@ fun HomeScreen(
                             onClick = { onSectionChange(HomeSection.INSIGHTS) }
                         )
                     }
-                    if (deletedItems.isNotEmpty()) {
-                        item {
-                            SectionChip(
-                                label = "Source removed",
-                                count = deletedItems.size,
-                                icon = Icons.Outlined.Security,
-                                isSelected = selectedSection == HomeSection.DELETED,
-                                secondary = true,
-                                onClick = { onSectionChange(HomeSection.DELETED) }
-                            )
-                        }
+                    item {
+                        SectionChip(
+                            label = "Deleted",
+                            count = deletedItems.size,
+                            icon = Icons.Outlined.Security,
+                            isSelected = selectedSection == HomeSection.DELETED,
+                            secondary = true,
+                            onClick = { onSectionChange(HomeSection.DELETED) }
+                        )
                     }
                 }
             }
@@ -406,7 +417,7 @@ fun HomeScreen(
                         HomeSection.DIGEST -> Triple(
                             "No noise to digest",
                             "Low-priority promotions and social updates will gather here quietly.",
-                            Icons.Outlined.ViewList
+                            Icons.AutoMirrored.Outlined.ViewList
                         )
                         HomeSection.HISTORY -> Triple(
                             "History is clear",
@@ -414,7 +425,7 @@ fun HomeScreen(
                             Icons.Outlined.History
                         )
                         HomeSection.DELETED -> Triple(
-                            "No source-removed notifications",
+                            "No deleted notifications",
                             "Notifications canceled by their source apps can be preserved here. This does not prove a sender used “Delete for everyone”.",
                             Icons.Outlined.Security
                         )
@@ -437,6 +448,45 @@ fun HomeScreen(
                         item = item,
                         hideSensitive = hideSensitive,
                         onClick = { onOpenNotification(item) },
+                        onQuickRemind = { triggerAtMillis ->
+                            val prevState = item.state
+                            val prevReminder = item.remindAt
+                            onSetReminder(item.id, triggerAtMillis)
+                            onSetState(item.id, NotificationState.LATER)
+                            coroutineScope.launch {
+                                snackbarHostState.currentSnackbarData?.dismiss()
+                                val result = snackbarHostState.showSnackbar(
+                                    message = "Moved to Later (reminder set)",
+                                    actionLabel = "Undo",
+                                    duration = SnackbarDuration.Short
+                                )
+                                if (result == SnackbarResult.ActionPerformed) {
+                                    onSetReminder(item.id, prevReminder)
+                                    onSetState(item.id, prevState)
+                                }
+                            }
+                        },
+                        onQuickDone = {
+                            val prevState = item.state
+                            val prevReminder = item.remindAt
+                            onSetState(item.id, NotificationState.DONE)
+                            onSetReminder(item.id, null)
+                            coroutineScope.launch {
+                                snackbarHostState.currentSnackbarData?.dismiss()
+                                val result = snackbarHostState.showSnackbar(
+                                    message = "Marked as Done",
+                                    actionLabel = "Undo",
+                                    duration = SnackbarDuration.Short
+                                )
+                                if (result == SnackbarResult.ActionPerformed) {
+                                    onSetState(item.id, prevState)
+                                    onSetReminder(item.id, prevReminder)
+                                }
+                            }
+                        },
+                        onQuickTogglePin = {
+                            onTogglePin(item)
+                        },
                         modifier = Modifier.padding(horizontal = 16.dp)
                     )
                 }

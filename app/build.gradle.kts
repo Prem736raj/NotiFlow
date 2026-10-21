@@ -3,6 +3,17 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// Only explicitly supplied upload credentials may sign a release.
+// Private ~/.gradle/gradle.properties can be used in place of environment variables.
+val releaseSigningKeys = listOf("KEYSTORE_PATH", "KEYSTORE_PASSWORD", "KEY_ALIAS", "KEY_PASSWORD")
+val releaseSigning = releaseSigningKeys.associateWith { key ->
+    System.getenv(key)?.takeIf { it.isNotBlank() }
+        ?: (project.findProperty(key) as? String)?.takeIf { it.isNotBlank() }
+}
+val releaseKeystore = releaseSigning["KEYSTORE_PATH"]?.let { file(it) }
+val releaseCredentialsComplete = releaseSigningKeys.all { !releaseSigning[it].isNullOrBlank() }
+val releaseKeystoreExists = releaseKeystore?.isFile == true
+
 android {
     namespace = "com.premraj.notiflow"
     compileSdk {
@@ -23,23 +34,11 @@ android {
 
     signingConfigs {
         create("release") {
-            val keystorePath = System.getenv("KEYSTORE_PATH") ?: (project.findProperty("KEYSTORE_PATH") as? String)
-            val keystorePassword = System.getenv("KEYSTORE_PASSWORD") ?: (project.findProperty("KEYSTORE_PASSWORD") as? String)
-            val keyAlias = System.getenv("KEY_ALIAS") ?: (project.findProperty("KEY_ALIAS") as? String)
-            val keyPassword = System.getenv("KEY_PASSWORD") ?: (project.findProperty("KEY_PASSWORD") as? String)
-
-            if (!keystorePath.isNullOrBlank() && file(keystorePath).exists()) {
-                storeFile = file(keystorePath)
-                storePassword = keystorePassword
-                this.keyAlias = keyAlias
-                this.keyPassword = keyPassword
-            } else {
-                // Fallback to debug keystore so bundleRelease and assembleRelease produce a valid signed release artifact in local / CI builds
-                val debugConfig = getByName("debug")
-                storeFile = debugConfig.storeFile
-                storePassword = debugConfig.storePassword
-                this.keyAlias = debugConfig.keyAlias
-                this.keyPassword = debugConfig.keyPassword
+            if (releaseCredentialsComplete && releaseKeystoreExists) {
+                storeFile = releaseKeystore
+                storePassword = releaseSigning.getValue("KEYSTORE_PASSWORD")
+                keyAlias = releaseSigning.getValue("KEY_ALIAS")
+                keyPassword = releaseSigning.getValue("KEY_PASSWORD")
             }
         }
     }
@@ -47,7 +46,11 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = if (releaseCredentialsComplete && releaseKeystoreExists) {
+                signingConfigs.getByName("release")
+            } else {
+                null // Unconfigured release tasks are explicitly rejected below.
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -68,6 +71,41 @@ android {
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
+}
+
+val verifyReleaseSigning = tasks.register("verifyReleaseSigning") {
+    group = "verification"
+    description = "Reject release packaging unless an explicit non-debug upload keystore is configured."
+    doLast {
+        val missing = releaseSigningKeys.filter { releaseSigning[it].isNullOrBlank() }
+        if (missing.isNotEmpty()) {
+            throw GradleException(
+                "Release signing requires explicit upload-key credentials: ${missing.joinToString()}. " +
+                    "Configure these via environment variables or private Gradle properties."
+            )
+        }
+        val keystoreFile = releaseKeystore
+        if (keystoreFile == null || !keystoreFile.isFile) {
+            throw GradleException("Release signing keystore is missing or not a file. Verify KEYSTORE_PATH.")
+        }
+        val debugKeystore = android.signingConfigs.getByName("debug").storeFile
+        if (keystoreFile.name.equals("debug.keystore", ignoreCase = true) ||
+            (debugKeystore != null && keystoreFile.canonicalFile == debugKeystore.canonicalFile)
+        ) {
+            throw GradleException("Refusing to sign a release with the Android Debug keystore.")
+        }
+    }
+}
+
+// Debug builds remain available without release credentials. All release packaging
+// entry points enforce the signing prerequisite before producing an artifact.
+tasks.matching { task ->
+    task.name in setOf(
+        "preReleaseBuild", "bundleRelease", "assembleRelease", "packageRelease",
+        "packageReleaseBundle", "signReleaseBundle"
+    )
+}.configureEach {
+    dependsOn(verifyReleaseSigning)
 }
 
 dependencies {

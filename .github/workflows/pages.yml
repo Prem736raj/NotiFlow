@@ -1,0 +1,46 @@
+name: Publish NotiFlow policy website
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/index.html"
+      - "docs/privacy-policy/**"
+      - "docs/privacy-policy.html"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: notiflow-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Assemble public-only site
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/notiflow-site/privacy-policy"
+          cp docs/index.html "$RUNNER_TEMP/notiflow-site/index.html"
+          cp docs/privacy-policy/index.html "$RUNNER_TEMP/notiflow-site/privacy-policy/index.html"
+      - name: Upload public site
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ${{ runner.temp }}/notiflow-site
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

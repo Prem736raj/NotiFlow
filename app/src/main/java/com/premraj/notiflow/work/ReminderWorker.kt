@@ -11,6 +11,7 @@ import androidx.work.WorkerParameters
 import com.premraj.notiflow.MainActivity
 import com.premraj.notiflow.R
 import com.premraj.notiflow.appGraph
+import com.premraj.notiflow.data.MetricsTracker
 import com.premraj.notiflow.data.NotificationCategory
 import com.premraj.notiflow.data.NotificationState
 import com.premraj.notiflow.util.NotificationChannels
@@ -76,6 +77,7 @@ class ReminderWorker(
         return runCatching {
             postNotification(notificationId, notification)
             applicationContext.appGraph.store.setState(id, NotificationState.ACTIVE)
+            MetricsTracker.recordEvent(applicationContext, MetricsTracker.EVENT_REMINDER_DELIVERED)
         }.fold(
             onSuccess = { Result.success() },
             onFailure = { Result.retry() }

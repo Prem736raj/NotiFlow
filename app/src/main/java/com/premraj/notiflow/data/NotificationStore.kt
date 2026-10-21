@@ -351,6 +351,13 @@ class NotificationStore(context: Context) {
         }
     }
 
+    suspend fun deleteExpenseByNotificationId(notificationId: Long) = withContext(Dispatchers.IO) {
+        mutationMutex.withLock {
+            helper.writableDatabase.delete(TABLE_EXPENSES, "notification_id=?", arrayOf(notificationId.toString()))
+            refreshFromDb()
+        }
+    }
+
     suspend fun getExpenseSummary(since: Long = 0L, until: Long = Long.MAX_VALUE): ExpenseSummary =
         withContext(Dispatchers.IO) {
             val list = queryExpenses("timestamp >= ? AND timestamp <= ?", arrayOf(since.toString(), until.toString()))

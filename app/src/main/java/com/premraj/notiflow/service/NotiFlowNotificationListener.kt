@@ -32,20 +32,48 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
+import android.content.ComponentName
+import android.provider.Settings
+import com.premraj.notiflow.data.MetricsTracker
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
 class NotiFlowNotificationListener : NotificationListenerService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onListenerConnected() {
         super.onListenerConnected()
         instance = this
+        _isServiceConnected.value = true
+        autoRebindAttempts = 0
+        runCatching {
+            MetricsTracker.recordEvent(applicationContext, MetricsTracker.EVENT_PERMISSION_ENABLED)
+        }
     }
 
     override fun onListenerDisconnected() {
+        _isServiceConnected.value = false
         if (instance === this) instance = null
+        runCatching {
+            MetricsTracker.recordEvent(applicationContext, MetricsTracker.EVENT_LISTENER_DISCONNECTED)
+            if (!isAccessGranted(this)) {
+                MetricsTracker.recordEvent(applicationContext, MetricsTracker.EVENT_PERMISSION_REVOKED)
+            }
+        }
+        val now = System.currentTimeMillis()
+        if (isAccessGranted(this) && (now - lastRebindAttemptTime > REBIND_COOLDOWN_MS) && autoRebindAttempts < MAX_CONSECUTIVE_AUTO_REBINDS) {
+            lastRebindAttemptTime = now
+            autoRebindAttempts++
+            runCatching {
+                requestRebind(ComponentName(this, NotiFlowNotificationListener::class.java))
+            }
+        }
         super.onListenerDisconnected()
     }
 
     override fun onDestroy() {
+        _isServiceConnected.value = false
         if (instance === this) instance = null
         scope.cancel()
         super.onDestroy()
@@ -210,6 +238,10 @@ class NotiFlowNotificationListener : NotificationListenerService() {
         }
 
         val stored = graph.store.get(id) ?: return
+        _lastCapturedTimestamp.value = System.currentTimeMillis()
+        runCatching {
+            MetricsTracker.recordEvent(this, MetricsTracker.EVENT_CAPTURE_VERIFIED)
+        }
 
         graph.voiceReader.speak(stored)
 
@@ -290,6 +322,7 @@ class NotiFlowNotificationListener : NotificationListenerService() {
         }
     }
 
+    @androidx.annotation.RequiresApi(Build.VERSION_CODES.O)
     override fun onNotificationRemoved(sbn: StatusBarNotification, rankingMap: RankingMap, reason: Int) {
         if (sbn.packageName == packageName) return
         val removedBySource = reason == REASON_APP_CANCEL || reason == REASON_APP_CANCEL_ALL
@@ -327,6 +360,43 @@ class NotiFlowNotificationListener : NotificationListenerService() {
     companion object {
         @Volatile
         private var instance: NotiFlowNotificationListener? = null
+
+        private const val REBIND_COOLDOWN_MS = 60_000L
+        private const val MAX_CONSECUTIVE_AUTO_REBINDS = 3
+
+        @Volatile
+        private var lastRebindAttemptTime = 0L
+        @Volatile
+        private var autoRebindAttempts = 0
+
+        private val _isServiceConnected = MutableStateFlow(false)
+        val isServiceConnected: StateFlow<Boolean> = _isServiceConnected.asStateFlow()
+
+        private val _lastCapturedTimestamp = MutableStateFlow(0L)
+        val lastCapturedTimestamp: StateFlow<Long> = _lastCapturedTimestamp.asStateFlow()
+
+        fun isConnected(): Boolean = _isServiceConnected.value
+
+        fun getLastCapturedAt(): Long = _lastCapturedTimestamp.value
+
+        fun isAccessGranted(context: Context): Boolean {
+            val flat = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners").orEmpty()
+            val expected = ComponentName(context, NotiFlowNotificationListener::class.java).flattenToString()
+            return flat.split(":").any { it.equals(expected, ignoreCase = true) }
+        }
+
+        fun requestRebindSafely(context: Context): Boolean {
+            val now = System.currentTimeMillis()
+            if (now - lastRebindAttemptTime < 5_000L) {
+                return false
+            }
+            lastRebindAttemptTime = now
+            autoRebindAttempts = 0
+            return runCatching {
+                requestRebind(ComponentName(context, NotiFlowNotificationListener::class.java))
+                true
+            }.getOrDefault(false)
+        }
 
         fun openOriginal(
             context: Context,

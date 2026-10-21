@@ -16,6 +16,7 @@ import com.premraj.notiflow.data.FocusProfileType
 import com.premraj.notiflow.data.FocusStatus
 import com.premraj.notiflow.data.InsightsTimeRange
 import com.premraj.notiflow.data.LearnedPreference
+import com.premraj.notiflow.data.MetricsTracker
 import com.premraj.notiflow.data.NotificationCategory
 import com.premraj.notiflow.data.NotificationInsights
 import com.premraj.notiflow.data.NotificationItem
@@ -84,14 +85,22 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
 
     fun setState(id: Long, state: NotificationState) = viewModelScope.launch {
         graph.store.setState(id, state)
-        if (state != NotificationState.LATER) graph.workScheduler.cancelReminder(id)
+        if (state == NotificationState.LATER) {
+            MetricsTracker.recordEvent(getApplication(), MetricsTracker.EVENT_NOTIFICATION_MARKED_LATER)
+        } else {
+            graph.workScheduler.cancelReminder(id)
+        }
         refreshStorageStats()
     }
 
     fun setReminder(id: Long, atMillis: Long?) = viewModelScope.launch {
         graph.store.setReminder(id, atMillis)
-        if (atMillis == null) graph.workScheduler.cancelReminder(id)
-        else graph.workScheduler.scheduleReminder(id, atMillis)
+        if (atMillis == null) {
+            graph.workScheduler.cancelReminder(id)
+        } else {
+            graph.workScheduler.scheduleReminder(id, atMillis)
+            MetricsTracker.recordEvent(getApplication(), MetricsTracker.EVENT_REMINDER_SCHEDULED)
+        }
     }
 
     fun setCategory(item: NotificationItem, category: NotificationCategory) = viewModelScope.launch {
@@ -148,6 +157,19 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun clearHistory() = clearAllHistory()
+
+    fun removeExpenseForNotification(notificationId: Long) = viewModelScope.launch {
+        graph.store.deleteExpenseByNotificationId(notificationId)
+    }
+
+    fun getAvailableTemplates(): List<com.premraj.notiflow.data.NotificationTemplate> {
+        return com.premraj.notiflow.data.NotificationTemplates.getAvailableTemplates(graph.preferences)
+    }
+
+    fun applyTemplate(templateId: String, enable: Boolean) {
+        com.premraj.notiflow.data.NotificationTemplates.applyTemplate(graph.preferences, templateId, enable)
+        bumpPrefs()
+    }
 
     fun setDigestEnabled(enabled: Boolean) {
         graph.preferences.digestEnabled = enabled

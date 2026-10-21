@@ -54,6 +54,12 @@ object BackupExporter {
         return formulaSafe.replace("\"", "\"\"")
     }
 
+    const val MIN_PASSWORD_LENGTH = 12
+
+    class WeakPasswordException(message: String = "Passphrase must be at least 12 characters long") : IllegalArgumentException(message)
+    class CorruptArchiveException(message: String, cause: Throwable? = null) : IllegalArgumentException(message, cause)
+    class InvalidPasswordException(message: String = "Incorrect passphrase for encrypted archive", cause: Throwable? = null) : SecurityException(message, cause)
+
     fun createEncryptedBackup(
         notifications: List<NotificationItem>,
         preferences: UserPreferences,
@@ -65,8 +71,15 @@ object BackupExporter {
         vipRules: Set<String>,
         password: String
     ): String {
+        if (password.length < MIN_PASSWORD_LENGTH) {
+            throw WeakPasswordException("Passphrase must be at least $MIN_PASSWORD_LENGTH characters long")
+        }
+
         val root = JSONObject()
-        root.put("version", 1)
+        root.put("version", 2)
+        root.put("format", "notiflow-archive-v2")
+        root.put("app_version", "0.1.0")
+        root.put("item_count", notifications.size)
         root.put("created_at", System.currentTimeMillis())
 
         val notifArray = JSONArray()
@@ -95,8 +108,29 @@ object BackupExporter {
     }
 
     fun decryptBackup(encryptedPayload: String, password: String): Result<JSONObject> = runCatching {
-        val jsonString = decrypt(encryptedPayload, password)
-        JSONObject(jsonString)
+        if (password.isBlank()) throw WeakPasswordException("Passphrase cannot be blank")
+        val jsonString = try {
+            decrypt(encryptedPayload, password)
+        } catch (e: javax.crypto.AEADBadTagException) {
+            throw InvalidPasswordException("Incorrect passphrase", e)
+        } catch (e: javax.crypto.BadPaddingException) {
+            throw InvalidPasswordException("Incorrect passphrase", e)
+        } catch (e: IllegalArgumentException) {
+            throw CorruptArchiveException("Invalid or malformed archive payload", e)
+        } catch (t: Throwable) {
+            throw CorruptArchiveException("Failed to decrypt archive", t)
+        }
+
+        try {
+            val root = JSONObject(jsonString)
+            val version = root.optInt("version", 1)
+            if (version > 2) {
+                throw CorruptArchiveException("Unsupported archive version: $version")
+            }
+            root
+        } catch (e: org.json.JSONException) {
+            throw CorruptArchiveException("Malformed JSON in decrypted archive", e)
+        }
     }
 
     fun writeEncryptedBackupToFile(

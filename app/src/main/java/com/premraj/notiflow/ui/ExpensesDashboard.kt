@@ -24,7 +24,7 @@ import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.ArrowDownward
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.CreditCard
-import androidx.compose.material.icons.outlined.ReceiptLong
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
@@ -210,7 +210,7 @@ fun ExpensesDashboard(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Outlined.ReceiptLong,
+                                    imageVector = Icons.AutoMirrored.Outlined.ReceiptLong,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(16.dp)
@@ -270,7 +270,7 @@ fun ExpensesDashboard(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Outlined.ReceiptLong,
+                                        imageVector = Icons.AutoMirrored.Outlined.ReceiptLong,
                                         contentDescription = null,
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(16.dp)
@@ -464,7 +464,7 @@ fun ExpenseTransactionCard(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.ReceiptLong,
+                    imageVector = Icons.AutoMirrored.Outlined.ReceiptLong,
                     contentDescription = null,
                     tint = if (isDebit) {
                         if (dark) Color(0xFFF87171) else Color(0xFFDC2626)

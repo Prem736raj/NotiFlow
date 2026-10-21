@@ -42,14 +42,24 @@ import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.WorkOutline
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import java.util.Calendar
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -112,9 +122,13 @@ fun NotificationCard(
     item: NotificationItem,
     hideSensitive: Boolean,
     onClick: () -> Unit,
+    onQuickRemind: ((Long) -> Unit)? = null,
+    onQuickDone: (() -> Unit)? = null,
+    onQuickTogglePin: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    var remindMenuExpanded by remember { mutableStateOf(false) }
     val effectivePriority = LocalIntelligence.effectivePriority(item)
     val isHighPriority = effectivePriority == NotificationPriority.HIGH
     val categoryStyle = getCategoryStyle(item.category)
@@ -308,94 +322,232 @@ fun NotificationCard(
                 Spacer(Modifier.height(12.dp))
 
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(100.dp),
-                        color = categoryStyle.containerColor
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f, fill = false)
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                imageVector = categoryStyle.icon,
-                                contentDescription = null,
-                                tint = categoryStyle.onContainerColor,
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Text(
-                                text = categoryStyle.shortLabel,
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
-                                color = categoryStyle.onContainerColor,
-                                maxLines = 1
-                            )
-                        }
-                    }
-
-                    if (isHighPriority) {
                         Surface(
                             shape = RoundedCornerShape(100.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer
-                        ) {
-                            Text(
-                                text = "Important",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
-                                maxLines = 1
-                            )
-                        }
-                    }
-
-                    if (item.isVip) {
-                        Surface(
-                            shape = RoundedCornerShape(100.dp),
-                            color = Color(0xFFF59E0B).copy(alpha = 0.16f)
+                            color = categoryStyle.containerColor
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Outlined.Star,
-                                    contentDescription = "VIP",
-                                    tint = Color(0xFFF59E0B),
+                                    imageVector = categoryStyle.icon,
+                                    contentDescription = null,
+                                    tint = categoryStyle.onContainerColor,
                                     modifier = Modifier.size(13.dp)
                                 )
                                 Text(
-                                    text = "VIP",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                                    color = Color(0xFFF59E0B)
+                                    text = categoryStyle.shortLabel,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                                    color = categoryStyle.onContainerColor,
+                                    maxLines = 1
                                 )
+                            }
+                        }
+
+                        if (isHighPriority) {
+                            Surface(
+                                shape = RoundedCornerShape(100.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer
+                            ) {
+                                Text(
+                                    text = "Important",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+                                    maxLines = 1
+                                )
+                            }
+                        }
+
+                        if (item.isVip) {
+                            Surface(
+                                shape = RoundedCornerShape(100.dp),
+                                color = Color(0xFFF59E0B).copy(alpha = 0.16f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Star,
+                                        contentDescription = "VIP",
+                                        tint = Color(0xFFF59E0B),
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Text(
+                                        text = "VIP",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                                        color = Color(0xFFF59E0B)
+                                    )
+                                }
+                            }
+                        }
+
+                        if (item.pinned) {
+                            Surface(
+                                shape = RoundedCornerShape(100.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.PushPin,
+                                        contentDescription = "Pinned",
+                                        tint = MaterialTheme.colorScheme.secondary,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Text(
+                                        text = "Pinned",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                                        color = MaterialTheme.colorScheme.secondary
+                                    )
+                                }
                             }
                         }
                     }
 
-                    if (item.pinned) {
-                        Surface(
-                            shape = RoundedCornerShape(100.dp),
-                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                    if (onQuickRemind != null || onQuickDone != null || onQuickTogglePin != null) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(3.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.PushPin,
-                                    contentDescription = "Pinned",
-                                    tint = MaterialTheme.colorScheme.secondary,
-                                    modifier = Modifier.size(13.dp)
-                                )
-                                Text(
-                                    text = "Pinned",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                                    color = MaterialTheme.colorScheme.secondary
-                                )
+                            if (onQuickRemind != null) {
+                                Box {
+                                    IconButton(
+                                        onClick = { remindMenuExpanded = true },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Schedule,
+                                            contentDescription = "Remind me",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                    DropdownMenu(
+                                        expanded = remindMenuExpanded,
+                                        onDismissRequest = { remindMenuExpanded = false }
+                                    ) {
+                                        val now = System.currentTimeMillis()
+                                        val cal = Calendar.getInstance()
+
+                                        val tonightCal = Calendar.getInstance().apply {
+                                            set(Calendar.HOUR_OF_DAY, 20)
+                                            set(Calendar.MINUTE, 0)
+                                            set(Calendar.SECOND, 0)
+                                            if (timeInMillis <= now + 30 * 60 * 1000) {
+                                                add(Calendar.HOUR_OF_DAY, 2)
+                                            }
+                                        }
+                                        DropdownMenuItem(
+                                            text = { Text("Tonight (8:00 PM)") },
+                                            onClick = {
+                                                remindMenuExpanded = false
+                                                onQuickRemind(tonightCal.timeInMillis)
+                                            }
+                                        )
+
+                                        val tomorrowCal = Calendar.getInstance().apply {
+                                            add(Calendar.DAY_OF_YEAR, 1)
+                                            set(Calendar.HOUR_OF_DAY, 9)
+                                            set(Calendar.MINUTE, 0)
+                                            set(Calendar.SECOND, 0)
+                                        }
+                                        DropdownMenuItem(
+                                            text = { Text("Tomorrow (9:00 AM)") },
+                                            onClick = {
+                                                remindMenuExpanded = false
+                                                onQuickRemind(tomorrowCal.timeInMillis)
+                                            }
+                                        )
+
+                                        DropdownMenuItem(
+                                            text = { Text("In 1 hour") },
+                                            onClick = {
+                                                remindMenuExpanded = false
+                                                onQuickRemind(now + 1 * 3600 * 1000L)
+                                            }
+                                        )
+
+                                        DropdownMenuItem(
+                                            text = { Text("In 2 hours") },
+                                            onClick = {
+                                                remindMenuExpanded = false
+                                                onQuickRemind(now + 2 * 3600 * 1000L)
+                                            }
+                                        )
+
+                                        DropdownMenuItem(
+                                            text = { Text("Custom date & time...") },
+                                            onClick = {
+                                                remindMenuExpanded = false
+                                                DatePickerDialog(
+                                                    context,
+                                                    { _, year, month, day ->
+                                                        TimePickerDialog(
+                                                            context,
+                                                            { _, hour, minute ->
+                                                                val customCal = Calendar.getInstance().apply {
+                                                                    set(year, month, day, hour, minute, 0)
+                                                                }
+                                                                onQuickRemind(customCal.timeInMillis)
+                                                            },
+                                                            cal.get(Calendar.HOUR_OF_DAY),
+                                                            cal.get(Calendar.MINUTE),
+                                                            false
+                                                        ).show()
+                                                    },
+                                                    cal.get(Calendar.YEAR),
+                                                    cal.get(Calendar.MONTH),
+                                                    cal.get(Calendar.DAY_OF_MONTH)
+                                                ).show()
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+
+                            if (onQuickTogglePin != null) {
+                                IconButton(
+                                    onClick = onQuickTogglePin,
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.PushPin,
+                                        contentDescription = if (item.pinned) "Unpin" else "Pin",
+                                        tint = if (item.pinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+
+                            if (onQuickDone != null && item.state != com.premraj.notiflow.data.NotificationState.DONE) {
+                                IconButton(
+                                    onClick = onQuickDone,
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.CheckCircle,
+                                        contentDescription = "Mark Done",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
                             }
                         }
                     }

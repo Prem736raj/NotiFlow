@@ -21,7 +21,7 @@ NotiFlow is an Android notification inbox focused on local-first notification hi
 ### Partial or intentionally constrained
 
 - **Focus profiles:** manual and scheduled status are implemented, but focus-based notification suppression is intentionally not enforced until its policy is device-tested.
-- **Local AI:** MediaPipe `tasks-genai:0.10.27` integration remains isolated behind `GemmaClassifier`. Automatic network model download is disabled. The current app has no production-ready verified model-import/acquisition flow, so rules-only mode is the safe default.
+- **Local AI:** `GemmaClassifier` is currently a fallback stub. No model inference runtime is packaged. Automatic network model download is disabled, so rules-only mode is the actual shipped implementation.
 - **Encrypted archive export:** the current v1 export is password-protected and intended for data portability/reference. There is no full notification-history restore path or restore UI yet.
 - **Anti-revoke:** NotiFlow preserves captured notification history after a source notification disappears; it does **not** claim to prove a sender used “Delete for everyone.”
 - **Voice reader:** incoming notifications are wired to the TTS policy engine, but real routing/OEM/device behavior still requires physical-device verification.
@@ -51,7 +51,7 @@ Current build configuration:
 - Java: 17
 - Compose BOM: 2026.09.00
 - WorkManager: 2.12.0
-- MediaPipe Tasks GenAI: 0.10.27
+- Bundled generative-model runtime: none (local rules-first fallback is active)
 - app version: 0.1.0 (versionCode 1)
 
 The wrapper is present: `gradlew`, `gradlew.bat`, `gradle/wrapper/gradle-wrapper.jar`, and `gradle-wrapper.properties`.
@@ -67,7 +67,7 @@ From a machine with the Android SDK configured:
 ./gradlew assembleDebug
 ```
 
-The repository also contains `.github/workflows/android.yml` on the production-hardening branch which runs unit tests, lint, and a debug assembly in GitHub Actions (verified passing in CI Runs `36440635850` and `36441460246`).
+The repository also contains `.github/workflows/android.yml`, which requests unit tests, lint, a debug build, a release bundle, and instrumented Android tests. A generated release bundle is not necessarily production-ready: the current release-signing configuration falls back to an Android Debug key without explicit production credentials.
 
 ## Device verification still required
 
@@ -75,7 +75,7 @@ NotificationListenerService behavior, notification cancellation, clipboard prese
 
 ## Local AI runtime note
 
-Google's current MediaPipe LLM Inference Android guide documents `com.google.mediapipe:tasks-genai:0.10.27` but now describes that API as maintenance-only and recommends LiteRT-LM for new work. Model format/identity must be verified against the exact runtime before enabling acquisition. NotiFlow therefore does not treat “non-empty model file” as sufficient production evidence and does not auto-download a model.
+Google's MediaPipe LLM Inference Android guide documents `com.google.mediapipe:tasks-genai:0.10.27`, but describes the API as maintenance-only and recommends LiteRT-LM for new work. **NotiFlow's current app/build.gradle.kts does not include that inference dependency.** Model format/identity must be verified against the eventual runtime before enabling acquisition; NotiFlow does not auto-download a model.
 
 Official references:
 
@@ -85,4 +85,4 @@ Official references:
 
 ## Audit
 
-See `AUDIT_FINDINGS.md` on the production-hardening branch for the baseline, claim-vs-code table, feature truth table, prioritized defects, verification gates, and remaining device/Play work.
+See `AUDIT_FINDINGS.md` for the engineering audit, [the product and growth roadmap](docs/NOTIFLOW_GROWTH_ROADMAP_2026.md) for priorities and metrics, and [release preparation](docs/RELEASE_PREPARATION.md) for safe signing and GitHub Pages deployment instructions.

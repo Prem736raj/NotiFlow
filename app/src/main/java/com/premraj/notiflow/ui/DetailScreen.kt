@@ -33,18 +33,18 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Archive
-import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Call
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.Key
-import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.PushPin
-import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Security
@@ -107,6 +107,7 @@ fun DetailScreen(
     onPinnedChange: (Boolean) -> Unit,
     onVipChange: (Boolean) -> Unit,
     onDelete: () -> Unit,
+    onRemoveExpense: () -> Unit = {},
     onOpenOriginal: () -> Boolean
 ) {
     val context = LocalContext.current
@@ -146,7 +147,7 @@ fun DetailScreen(
                         modifier = Modifier.padding(start = 8.dp).size(40.dp)
                     ) {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.Outlined.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
                         }
                     }
                 },
@@ -328,7 +329,7 @@ fun DetailScreen(
                                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Outlined.ReceiptLong,
+                                        imageVector = Icons.AutoMirrored.Outlined.ReceiptLong,
                                         contentDescription = null,
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(22.dp)
@@ -522,7 +523,7 @@ fun DetailScreen(
                         items(smartActions, key = { it.label + it.hashCode() }) { action ->
                             val icon = when (action) {
                                 is SmartAction.CopyCode -> Icons.Outlined.ContentCopy
-                                is SmartAction.OpenUrl -> Icons.Outlined.OpenInNew
+                                is SmartAction.OpenUrl -> Icons.AutoMirrored.Outlined.OpenInNew
                                 is SmartAction.Call -> Icons.Outlined.Call
                                 is SmartAction.OpenMap -> Icons.Outlined.Place
                                 is SmartAction.AddCalendar -> Icons.Outlined.Event
@@ -668,6 +669,91 @@ fun DetailScreen(
                                 }
                             }
                         }
+                        val explanation = when {
+                            item.isVip -> "Important because sender/app is marked as VIP."
+                            item.priorityOverridden -> "Priority set by your saved custom rule."
+                            item.category == NotificationCategory.OTP -> "High priority: 2FA / verification code detected."
+                            item.category == NotificationCategory.PAYMENT -> "High priority: Bank transaction or payment alert detected."
+                            item.category == NotificationCategory.PROMOTION -> "Low priority: Promotional offer or discount keyword pattern detected."
+                            item.category == NotificationCategory.SPAM -> "Low priority: Spam or low-value content pattern detected."
+                            item.priority == NotificationPriority.HIGH -> "High priority: Timely alert deserving immediate attention."
+                            item.priority == NotificationPriority.LOW -> "Low priority: Noise contained for scheduled digest."
+                            else -> "Normal priority: Standard notification."
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)
+                        ) {
+                            Column(Modifier.padding(12.dp)) {
+                                Text(
+                                    text = "Why this classification?",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    text = explanation,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Confidence: ${(item.confidence * 100).toInt()}% • On-device rules engine",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.outline,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
+                            }
+                        }
+
+                        // Direct 1-tap correction actions
+                        Text("Direct corrections", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(6.dp))
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (item.priority != NotificationPriority.HIGH) {
+                                item {
+                                    OutlinedButton(
+                                        onClick = { onPriorityChange(NotificationPriority.HIGH) },
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        Text("Always treat as Important")
+                                    }
+                                }
+                            }
+                            if (item.category == NotificationCategory.PROMOTION || item.category == NotificationCategory.SPAM) {
+                                item {
+                                    OutlinedButton(
+                                        onClick = { onCategoryChange(NotificationCategory.MESSAGE) },
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        Text("Not a promotion")
+                                    }
+                                }
+                            }
+                            if (item.expenseTransaction != null) {
+                                item {
+                                    OutlinedButton(
+                                        onClick = onRemoveExpense,
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        Text("Not an expense")
+                                    }
+                                }
+                            }
+                            if (!item.isVip) {
+                                item {
+                                    OutlinedButton(
+                                        onClick = { onVipChange(true) },
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        Text("Make VIP")
+                                    }
+                                }
+                            }
+                        }
+
                         if (item.categoryOverridden || item.priorityOverridden) {
                             Text(
                                 "Your manual adjustments are saved and applied to future notifications from this app.",
@@ -697,7 +783,7 @@ fun DetailScreen(
                                 },
                                 shape = RoundedCornerShape(12.dp)
                             ) {
-                                Icon(Icons.Outlined.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
                                 Text("Open original")
                             }

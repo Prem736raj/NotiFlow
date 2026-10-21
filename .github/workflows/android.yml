@@ -42,8 +42,31 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
-      - name: Verify build and release bundle
+      - name: Generate ephemeral CI-only upload key
+        shell: bash
+        run: |
+          keytool -genkeypair -noprompt \
+            -keystore "$RUNNER_TEMP/notiflow-ci-only.jks" \
+            -storepass "ci-build-only" -keypass "ci-build-only" \
+            -alias ciOnly -keyalg RSA -keysize 3072 -validity 2 \
+            -dname "CN=NotiFlow CI Only,O=Test Builds,C=US"
+
+      - name: Verify build and release bundle (CI-only certificate)
+        env:
+          KEYSTORE_PATH: ${{ runner.temp }}/notiflow-ci-only.jks
+          KEYSTORE_PASSWORD: ci-build-only
+          KEY_ALIAS: ciOnly
+          KEY_PASSWORD: ci-build-only
         run: ./gradlew testDebugUnitTest lintDebug assembleDebug bundleRelease --stacktrace
+
+      - name: Verify release bundle is never debug signed
+        shell: bash
+        run: |
+          keytool -printcert -jarfile app/build/outputs/bundle/release/app-release.aab | tee "$RUNNER_TEMP/release-cert.txt"
+          if grep -q "CN=Android Debug" "$RUNNER_TEMP/release-cert.txt"; then
+            echo "Release bundle unexpectedly uses Android Debug signing" >&2
+            exit 1
+          fi
 
   instrumented:
     runs-on: ubuntu-24.04

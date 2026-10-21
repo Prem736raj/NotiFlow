@@ -36,6 +36,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,6 +50,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import com.premraj.notiflow.R
+import com.premraj.notiflow.data.MetricsTracker
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 
@@ -58,6 +60,9 @@ fun OnboardingScreen(
     onComplete: () -> Unit
 ) {
     val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        MetricsTracker.recordEvent(context, MetricsTracker.EVENT_DISCLOSURE_SHOWN)
+    }
     var postGranted by remember {
         mutableStateOf(
             Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
@@ -114,7 +119,7 @@ fun OnboardingScreen(
                     TextButton(
                         onClick = {
                             runCatching {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://prem736raj.github.io/NotiFlow/privacy-policy"))
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://prem736raj.github.io/NotiFlow/privacy-policy/"))
                                 context.startActivity(intent)
                             }
                         }

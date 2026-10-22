@@ -313,7 +313,9 @@ class NotificationStore(context: Context) {
                         putNull("notification_id")
                     }
                 }
-                db.insertWithOnConflict(TABLE_SAVED_MEDIA, null, values, SQLiteDatabase.CONFLICT_IGNORE)
+                val inserted = db.insertWithOnConflict(TABLE_SAVED_MEDIA, null, values, SQLiteDatabase.CONFLICT_IGNORE)
+                db.setTransactionSuccessful()
+                inserted
             } finally {
                 db.endTransaction()
             }

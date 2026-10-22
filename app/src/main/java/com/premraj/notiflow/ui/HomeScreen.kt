@@ -78,6 +78,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
 import com.premraj.notiflow.R
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -249,42 +250,49 @@ fun HomeScreen(
                         } else {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Image(
                                     painter = painterResource(R.drawable.app_logo),
                                     contentDescription = null,
                                     modifier = Modifier
-                                        .size(32.dp)
-                                        .clip(RoundedCornerShape(10.dp))
+                                        .size(30.dp)
+                                        .clip(RoundedCornerShape(8.dp))
                                 )
                                 Text(
                                     text = "NotiFlow",
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
-                                val liveColor = if (listenerEnabled) Color(0xFF4CC58F) else Color(0xFFF59E0B)
+                                val liveColor = if (listenerEnabled) Color(0xFF10B981) else Color(0xFFF59E0B)
                                 Surface(
-                                    shape = RoundedCornerShape(50),
-                                    color = liveColor.copy(alpha = 0.15f)
+                                    shape = RoundedCornerShape(100.dp),
+                                    color = liveColor.copy(alpha = 0.12f),
+                                    border = BorderStroke(1.dp, liveColor.copy(alpha = 0.25f))
                                 ) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                     ) {
                                         Box(
                                             Modifier
-                                                .size(7.dp)
+                                                .size(6.dp)
                                                 .clip(CircleShape)
                                                 .background(liveColor)
                                         )
                                         Text(
-                                            if (listenerEnabled) "Capturing" else "Paused",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = liveColor
+                                            text = if (listenerEnabled) "Active" else "Paused",
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontWeight = FontWeight.SemiBold,
+                                                fontSize = 11.sp
+                                            ),
+                                            color = liveColor,
+                                            maxLines = 1,
+                                            softWrap = false
                                         )
                                     }
                                 }
@@ -299,8 +307,10 @@ fun HomeScreen(
                                     HomeSection.EXPENSES -> "100% offline bank & UPI spending tracker"
                                     HomeSection.INSIGHTS -> "Notification activity & distraction insights"
                                 },
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
@@ -322,49 +332,49 @@ fun HomeScreen(
                             Surface(
                                 shape = CircleShape,
                                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                modifier = Modifier.size(40.dp)
+                                modifier = Modifier.size(38.dp)
                             ) {
                                 IconButton(onClick = { selectionMode = true }) {
                                     Icon(
                                         Icons.Outlined.CheckBox,
                                         contentDescription = "Select notifications",
                                         tint = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.size(20.dp)
+                                        modifier = Modifier.size(19.dp)
                                     )
                                 }
                             }
-                            Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.width(4.dp))
                         }
                         Surface(
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            modifier = Modifier.size(40.dp)
+                            modifier = Modifier.size(38.dp)
                         ) {
                             IconButton(onClick = onSearch) {
                                 Icon(
                                     Icons.Outlined.Search,
                                     contentDescription = "Search",
                                     tint = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(19.dp)
                                 )
                             }
                         }
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(4.dp))
                         Surface(
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            modifier = Modifier.size(40.dp)
+                            modifier = Modifier.size(38.dp)
                         ) {
                             IconButton(onClick = onSettings) {
                                 Icon(
                                     Icons.Outlined.Settings,
                                     contentDescription = "Settings",
                                     tint = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(19.dp)
                                 )
                             }
                         }
-                        Spacer(Modifier.width(12.dp))
+                        Spacer(Modifier.width(6.dp))
                     }
                 }
             )
@@ -443,7 +453,7 @@ fun HomeScreen(
                 }
             }
 
-            // Primary workflow navigation stays focused on notification states.
+            // Unified primary navigation with refined Material 3 pill chips
             item {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp),
@@ -469,6 +479,15 @@ fun HomeScreen(
                     }
                     item {
                         SectionChip(
+                            label = "Digest",
+                            count = digestItems.size,
+                            icon = Icons.AutoMirrored.Outlined.ViewList,
+                            isSelected = selectedSection == HomeSection.DIGEST,
+                            onClick = { onSectionChange(HomeSection.DIGEST) }
+                        )
+                    }
+                    item {
+                        SectionChip(
                             label = "History",
                             count = historyItems.size,
                             icon = Icons.Outlined.History,
@@ -476,13 +495,33 @@ fun HomeScreen(
                             onClick = { onSectionChange(HomeSection.HISTORY) }
                         )
                     }
+                    if (deletedItems.isNotEmpty()) {
+                        item {
+                            SectionChip(
+                                label = "Removed",
+                                count = deletedItems.size,
+                                icon = Icons.Outlined.Security,
+                                isSelected = selectedSection == HomeSection.DELETED,
+                                onClick = { onSectionChange(HomeSection.DELETED) }
+                            )
+                        }
+                    }
                     item {
                         SectionChip(
-                            label = "Digest",
-                            count = digestItems.size,
-                            icon = Icons.AutoMirrored.Outlined.ViewList,
-                            isSelected = selectedSection == HomeSection.DIGEST,
-                            onClick = { onSectionChange(HomeSection.DIGEST) }
+                            label = "Expenses",
+                            count = expenses.size,
+                            icon = Icons.Outlined.AccountBalanceWallet,
+                            isSelected = selectedSection == HomeSection.EXPENSES,
+                            onClick = { onSectionChange(HomeSection.EXPENSES) }
+                        )
+                    }
+                    item {
+                        SectionChip(
+                            label = "Insights",
+                            count = null,
+                            icon = Icons.Outlined.BarChart,
+                            isSelected = selectedSection == HomeSection.INSIGHTS,
+                            onClick = { onSectionChange(HomeSection.INSIGHTS) }
                         )
                     }
                 }
@@ -496,35 +535,6 @@ fun HomeScreen(
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(horizontal = 18.dp)
                     )
-                }
-            }
-
-            // Secondary tools remain available without competing with the inbox states.
-            item {
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    item {
-                        SectionChip(
-                            label = "Expenses",
-                            count = expenses.size,
-                            icon = Icons.Outlined.AccountBalanceWallet,
-                            isSelected = selectedSection == HomeSection.EXPENSES,
-                            secondary = true,
-                            onClick = { onSectionChange(HomeSection.EXPENSES) }
-                        )
-                    }
-                    item {
-                        SectionChip(
-                            label = "Insights",
-                            count = null,
-                            icon = Icons.Outlined.BarChart,
-                            isSelected = selectedSection == HomeSection.INSIGHTS,
-                            secondary = true,
-                            onClick = { onSectionChange(HomeSection.INSIGHTS) }
-                        )
-                    }
                 }
             }
 
@@ -739,53 +749,58 @@ private fun SectionChip(
     count: Int?,
     icon: ImageVector,
     isSelected: Boolean,
-    secondary: Boolean = false,
     onClick: () -> Unit
 ) {
+    val containerColor = if (isSelected) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerHigh
+    }
+    val contentColor = if (isSelected) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val border = if (isSelected) {
+        BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+    } else {
+        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+    }
+
     Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = when {
-            isSelected -> MaterialTheme.colorScheme.primaryContainer
-            secondary -> MaterialTheme.colorScheme.surfaceContainerLow
-            else -> MaterialTheme.colorScheme.surfaceContainer
-        },
-        border = if (isSelected) {
-            BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
-        } else null,
+        shape = RoundedCornerShape(100.dp),
+        color = containerColor,
+        border = border,
         modifier = Modifier.clickable(onClick = onClick)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = contentColor,
                 modifier = Modifier.size(16.dp)
             )
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                else MaterialTheme.colorScheme.onSurfaceVariant
+                color = contentColor
             )
-            count?.let {
+            if (count != null && count > 0) {
                 Surface(
-                    shape = RoundedCornerShape(50),
-                    color = (if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                    else MaterialTheme.colorScheme.onSurfaceVariant).copy(alpha = 0.14f)
+                    shape = RoundedCornerShape(100.dp),
+                    color = contentColor.copy(alpha = 0.15f)
                 ) {
                     Text(
-                        text = it.toString(),
+                        text = count.toString(),
                         style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 1.dp)
+                        fontWeight = FontWeight.Bold,
+                        color = contentColor,
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 1.5.dp)
                     )
                 }
             }

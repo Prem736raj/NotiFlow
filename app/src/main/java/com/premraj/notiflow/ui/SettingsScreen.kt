@@ -13,6 +13,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -458,253 +461,88 @@ fun SettingsScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
                 title = { Text("Settings", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        modifier = Modifier.padding(start = 8.dp).size(40.dp)
+                    ) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                        }
                     }
                 }
             )
         }
     ) { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
+            // Group 1: General & Theme
             item {
-                SettingsCard(Icons.Outlined.Notifications, "Access") {
-                    SettingStatus(
-                        "Notification access",
-                        if (listenerEnabled) "Enabled" else "Off - new notifications cannot be captured",
-                        listenerEnabled
-                    )
-                    OutlinedButton(
-                        onClick = {
-                            runCatching {
-                                context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                SettingsGroup(icon = Icons.Outlined.Palette, title = "General & Theme") {
+                    Column {
+                        Text("Theme mode", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(8.dp))
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(AppThemeMode.entries) { mode ->
+                                FilterChip(
+                                    selected = prefs.appThemeMode == mode,
+                                    onClick = { viewModel.setAppThemeMode(mode) },
+                                    label = { Text(mode.label, fontWeight = FontWeight.SemiBold) }
+                                )
                             }
-                        },
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-                    ) { Text("Review notification access") }
-
-                    Spacer(Modifier.height(14.dp))
-                    SettingStatus(
-                        "Reminder & digest alerts",
-                        if (postGranted) "Allowed" else "Not allowed",
-                        postGranted
-                    )
-                    if (!postGranted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        OutlinedButton(
-                            onClick = { postPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) },
-                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-                        ) { Text("Allow NotiFlow alerts") }
-                    }
-                }
-            }
-
-            item {
-                SettingsCard(Icons.Outlined.Security, "System & Capture Health") {
-                    val connectionStatusText = when {
-                        !listenerEnabled -> "Permission Revoked"
-                        isServiceConnected -> "Connected & Active"
-                        else -> "Disconnected (Standby)"
-                    }
-                    val connectionPositive = listenerEnabled && isServiceConnected
-
-                    SettingStatus(
-                        "Listener connection status",
-                        connectionStatusText,
-                        connectionPositive
-                    )
-
-                    Spacer(Modifier.height(10.dp))
-
-                    val lastCapturedText = remember(lastCapturedTimestamp) {
-                        formatCapturedTimestamp(lastCapturedTimestamp)
-                    }
-
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("Last notification captured", fontWeight = FontWeight.Medium)
-                            Text(lastCapturedText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
 
-                    Spacer(Modifier.height(10.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
 
-                    OutlinedButton(
-                        onClick = {
-                            val rebindRequested = NotiFlowNotificationListener.requestRebindSafely(context)
-                            rebindStatusMessage = if (rebindRequested) {
-                                "Service rebind requested."
-                            } else {
-                                "Rebind throttled (cooldown active). Toggle notification access if issues persist."
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Reconnect Service")
-                    }
-
-                    rebindStatusMessage?.let { msg ->
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            text = msg,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-
-                    Spacer(Modifier.height(10.dp))
-
-                    OutlinedButton(
-                        onClick = {
-                            exportingDiagnostics = true
-                            scope.launch {
-                                runCatching {
-                                    val file = DiagnosticsExporter.exportDiagnosticsToFile(context)
-                                    DiagnosticsExporter.shareDiagnostics(context, file)
-                                }
-                                exportingDiagnostics = false
-                            }
-                        },
-                        enabled = !exportingDiagnostics,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Outlined.Share, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(if (exportingDiagnostics) "Generating report…" else "Export & Share Diagnostic Report (0% PII)")
-                    }
-
-                    Text(
-                        text = "Consent-based diagnostic report contains zero notification titles, message bodies, senders, or OTP codes. Strictly on-device health & error metadata.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
-            }
-
-            item {
-                SettingsCard(Icons.Outlined.Palette, "Appearance & Theme") {
-                    Text(
-                        "Choose how NotiFlow itself should look. Device wallpaper colors are optional so the app keeps a consistent identity by default.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(AppThemeMode.entries) { mode ->
-                            FilterChip(
-                                selected = prefs.appThemeMode == mode,
-                                onClick = { viewModel.setAppThemeMode(mode) },
-                                label = {
-                                    Column(Modifier.padding(vertical = 4.dp)) {
-                                        Text(mode.label, fontWeight = FontWeight.SemiBold)
-                                        Text(mode.subtitle, style = MaterialTheme.typography.labelSmall)
-                                    }
-                                }
-                            )
-                        }
-                    }
                     SettingSwitch(
-                        title = "Use device colors",
-                        subtitle = "Apply Android's wallpaper-derived Material You palette. AMOLED keeps pure black backgrounds.",
+                        title = "Use dynamic colors",
+                        subtitle = "Apply wallpaper-derived Material You colors on supported devices.",
                         checked = prefs.useDynamicColors,
                         onChecked = viewModel::setUseDynamicColors
                     )
-                }
-            }
 
-            item {
-                SettingsCard(Icons.Outlined.Schedule, "Digest") {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+
                     SettingSwitch(
-                        title = "Scheduled digest",
-                        subtitle = "Collect low-priority activity and summarize it once a day.",
+                        title = "Daily scheduled digest",
+                        subtitle = "Collect low-priority promotions and social updates into a daily digest.",
                         checked = prefs.digestEnabled,
                         onChecked = viewModel::setDigestEnabled
                     )
+
                     if (prefs.digestEnabled) {
-                        Text(
-                            "Delivery time",
-                            style = MaterialTheme.typography.labelLarge,
-                            modifier = Modifier.padding(top = 14.dp, bottom = 8.dp)
-                        )
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            val presets = listOf(8 to "Morning", 15 to "Afternoon", 19 to "Evening")
-                            items(presets) { (hour, label) ->
-                                FilterChip(
-                                    selected = prefs.digestHour == hour && prefs.digestMinute == 0,
-                                    onClick = { viewModel.setDigestTime(hour, 0) },
-                                    label = { Text(label) }
-                                )
-                            }
-                            item {
-                                FilterChip(
-                                    selected = prefs.digestMinute != 0 || prefs.digestHour !in listOf(8, 15, 19),
-                                    onClick = {
-                                        TimePickerDialog(
-                                            context,
-                                            { _, h, m -> viewModel.setDigestTime(h, m) },
-                                            prefs.digestHour,
-                                            prefs.digestMinute,
-                                            false
-                                        ).show()
-                                    },
-                                    label = { Text(formatTime(prefs.digestHour, prefs.digestMinute)) }
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            item {
-                SettingsCard(Icons.AutoMirrored.Outlined.VolumeOff, "Quiet sources") {
-                    Text(
-                        "Selected low-priority sources can be removed from the system shade after NotiFlow captures them.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text("Quiet categories", style = MaterialTheme.typography.labelLarge)
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
-                        val quietable = listOf(NotificationCategory.PROMOTION, NotificationCategory.SPAM, NotificationCategory.SOCIAL)
-                        items(quietable) { cat ->
-                            val quiet = cat in prefs.quietCategories()
-                            FilterChip(
-                                selected = quiet,
-                                onClick = { viewModel.setQuietCategory(cat, !quiet) },
-                                label = { Text(cat.label) }
-                            )
-                        }
-                    }
-                }
-            }
-
-            item {
-                SettingsCard(Icons.Outlined.Security, "VIPs") {
-                    Text(
-                        "VIP contacts and applications are elevated to High priority and protected from NotiFlow's current quiet-source cancellation policy.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    val vipRules = prefs.vipRules().toList()
-                    if (vipRules.isEmpty()) {
-                        Text("No VIP rules added yet.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
-                    } else {
-                        Column(modifier = Modifier.padding(top = 8.dp)) {
-                            vipRules.forEach { rule ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(rule, style = MaterialTheme.typography.bodyMedium)
-                                    IconButton(onClick = { viewModel.removeVipRule(rule) }) {
-                                        Icon(Icons.Outlined.Delete, contentDescription = "Remove VIP")
-                                    }
+                        Column {
+                            Text("Delivery time", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.height(6.dp))
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                val presets = listOf(8 to "Morning (8 AM)", 15 to "Afternoon (3 PM)", 19 to "Evening (7 PM)")
+                                items(presets) { (hour, label) ->
+                                    FilterChip(
+                                        selected = prefs.digestHour == hour && prefs.digestMinute == 0,
+                                        onClick = { viewModel.setDigestTime(hour, 0) },
+                                        label = { Text(label) }
+                                    )
+                                }
+                                item {
+                                    FilterChip(
+                                        selected = prefs.digestMinute != 0 || prefs.digestHour !in listOf(8, 15, 19),
+                                        onClick = {
+                                            TimePickerDialog(
+                                                context,
+                                                { _, h, m -> viewModel.setDigestTime(h, m) },
+                                                prefs.digestHour,
+                                                prefs.digestMinute,
+                                                false
+                                            ).show()
+                                        },
+                                        label = { Text("Custom: " + formatTime(prefs.digestHour, prefs.digestMinute)) }
+                                    )
                                 }
                             }
                         }
@@ -712,23 +550,172 @@ fun SettingsScreen(
                 }
             }
 
+            // Group 2: Capture & Focus
             item {
-                SettingsCard(Icons.Outlined.Bolt, "Automation rules") {
-                    Text(
-                        "Act on new notifications as they arrive. Rules match on-device and never leave your phone.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                SettingsGroup(icon = Icons.Outlined.Notifications, title = "Capture & Focus") {
+                    SettingStatusRow(
+                        title = "Notification capture access",
+                        detail = if (listenerEnabled) "Active · NotiFlow is actively capturing notifications."
+                        else "Off · Alerts cannot be captured until granted in Android settings.",
+                        positive = listenerEnabled,
+                        actionButton = {
+                            if (!listenerEnabled) {
+                                Button(
+                                    onClick = {
+                                        runCatching {
+                                            context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) { Text("Grant Notification Access") }
+                            } else {
+                                OutlinedButton(
+                                    onClick = {
+                                        runCatching {
+                                            context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) { Text("Review System Access") }
+                            }
+                        }
                     )
-                    val rules = prefs.automationRules()
-                    if (rules.isEmpty()) {
-                        Text(
-                            "No rules yet. Add a keyword to auto-pin invoices, highlight server alerts, or archive recurring noise.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 8.dp)
+
+                    if (!postGranted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+                        SettingStatusRow(
+                            title = "Background alerts permission",
+                            detail = "Required to deliver reminder alarms and scheduled digests.",
+                            positive = false,
+                            actionButton = {
+                                OutlinedButton(
+                                    onClick = { postPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) { Text("Allow Alerts Permission") }
+                            }
                         )
-                    } else {
-                        Column(modifier = Modifier.padding(top = 8.dp)) {
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+
+                    Column {
+                        Text("Quiet categories", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Auto-dismiss from Android status shade after NotiFlow captures them.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            val quietable = listOf(NotificationCategory.PROMOTION, NotificationCategory.SPAM, NotificationCategory.SOCIAL)
+                            items(quietable) { cat ->
+                                val quiet = cat in prefs.quietCategories()
+                                FilterChip(
+                                    selected = quiet,
+                                    onClick = { viewModel.setQuietCategory(cat, !quiet) },
+                                    label = { Text(cat.label) }
+                                )
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+
+                    // VIP Rules
+                    Column {
+                        val vipRules = prefs.vipRules().toList()
+                        var vipAppMenu by remember { mutableStateOf(false) }
+                        val unconfiguredApps = remember(observedApps, vipRules) {
+                            observedApps.filter { (pkg, _) -> pkg !in vipRules && !vipRules.any { r -> r.startsWith("$pkg|") } }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("VIP Rules (${vipRules.size})", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        }
+                        Text(
+                            "VIP contacts/apps stay high priority and are shielded from quiet dismissal.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (vipRules.isNotEmpty()) {
+                            Spacer(Modifier.height(6.dp))
+                            vipRules.forEach { rule ->
+                                val pkg = rule.substringBefore('|')
+                                val sender = rule.substringAfter('|', "").takeIf { it.isNotBlank() }
+                                val appTitle = appNames[pkg] ?: pkg
+                                val displayLabel = if (sender != null) "$sender · $appTitle" else appTitle
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        displayLabel,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    IconButton(onClick = { viewModel.removeVipRule(rule) }) {
+                                        Icon(Icons.Outlined.Delete, contentDescription = "Remove VIP", modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            }
+                        }
+                        if (unconfiguredApps.isNotEmpty()) {
+                            Spacer(Modifier.height(8.dp))
+                            Box {
+                                OutlinedButton(
+                                    onClick = { vipAppMenu = true },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text("Add VIP App")
+                                }
+                                DropdownMenu(
+                                    expanded = vipAppMenu,
+                                    onDismissRequest = { vipAppMenu = false }
+                                ) {
+                                    unconfiguredApps.forEach { (pkg, appName) ->
+                                        DropdownMenuItem(
+                                            text = { Text(appName) },
+                                            onClick = {
+                                                viewModel.setVipApp(pkg, true)
+                                                vipAppMenu = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+
+                    // Automation Rules
+                    Column {
+                        val rules = prefs.automationRules()
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Automation Rules (${rules.size})", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        }
+                        Text(
+                            "Match incoming notifications by keyword to auto-archive, pin, or highlight.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (rules.isNotEmpty()) {
+                            Spacer(Modifier.height(6.dp))
                             rules.forEach { rule ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -736,75 +723,54 @@ fun SettingsScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column(Modifier.weight(1f)) {
-                                        Text("“${rule.keyword}”", fontWeight = FontWeight.Medium)
+                                        Text("“${rule.keyword}”", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
                                         Text(
                                             listOfNotNull(
                                                 rule.action.label,
                                                 rule.packageName?.let { appNames[it] ?: it } ?: "Any app"
                                             ).joinToString(" · "),
-                                            style = MaterialTheme.typography.bodySmall,
+                                            style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                     Switch(
                                         checked = rule.enabled,
-                                        onCheckedChange = {
-                                            viewModel.setAutomationRuleEnabled(rule.id, it)
-                                        }
+                                        onCheckedChange = { viewModel.setAutomationRuleEnabled(rule.id, it) }
                                     )
                                     IconButton(onClick = { viewModel.removeAutomationRule(rule.id) }) {
-                                        Icon(Icons.Outlined.Delete, contentDescription = "Delete rule")
+                                        Icon(Icons.Outlined.Delete, contentDescription = "Delete rule", modifier = Modifier.size(18.dp))
                                     }
                                 }
                             }
                         }
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = { ruleDialog = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) { Text("Add Automation Rule") }
                     }
-                    OutlinedButton(
-                        onClick = { ruleDialog = true },
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-                    ) { Text("Add automation rule") }
-                    Text(
-                        "Auto-archive keeps the alert in History and never dismisses the source app's notification.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.padding(top = 6.dp)
-                    )
-                }
-            }
 
-            item {
-                SettingsCard(Icons.Outlined.Image, "Save WhatsApp media") {
-                    val mediaStats = viewModel.savedMediaStats.collectAsStateWithLifecycle().value
-                    val vmMediaMessage = viewModel.mediaScanMessage.collectAsStateWithLifecycle().value
-                    val permissionReady = MediaSaver.hasMediaReadAccess(context)
-                    val statusText = mediaStatusMessage ?: vmMediaMessage ?: run {
-                        when {
-                            prefs.saveMediaEnabled && !permissionReady -> "Media saving is on but access is revoked."
-                            mediaPermissionDenied -> "Photo/video access was denied. Grant it in Android settings."
-                            else -> null
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+
+                    // WhatsApp Media Saver
+                    Column {
+                        val mediaStats = viewModel.savedMediaStats.collectAsStateWithLifecycle().value
+                        val vmMediaMessage = viewModel.mediaScanMessage.collectAsStateWithLifecycle().value
+                        val permissionReady = MediaSaver.hasMediaReadAccess(context)
+                        val statusText = mediaStatusMessage ?: vmMediaMessage ?: run {
+                            when {
+                                prefs.saveMediaEnabled && !permissionReady -> "Media saving is enabled but photo/video permission is revoked."
+                                mediaPermissionDenied -> "Photo/video access was denied. Grant permission in Android settings."
+                                else -> null
+                            }
                         }
-                    }
-                    Text(
-                        "Keep a private, on-device copy of photos and videos you receive on WhatsApp. Copies stay inside NotiFlow's private storage and remove only when you delete them here. WhatsApp view-once media cannot be saved.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text("Save incoming media", fontWeight = FontWeight.Medium)
-                            Text(
-                                if (permissionReady) "Photos and videos are copied into NotiFlow's private storage when they land in shared storage."
-                                else "NotiFlow needs photo and video access before it can save media.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Switch(
+
+                        SettingSwitch(
+                            title = "Save WhatsApp Media",
+                            subtitle = "Preserve offline copies of incoming photos and videos in private storage.",
                             checked = prefs.saveMediaEnabled,
-                            onCheckedChange = { requested ->
+                            onChecked = { requested ->
                                 if (requested) {
                                     if (permissionReady) {
                                         mediaPermissionDenied = false
@@ -816,216 +782,310 @@ fun SettingsScreen(
                                     viewModel.setSaveMediaEnabled(false)
                                     mediaPermissionDenied = false
                                 }
-                            },
-                            enabled = true
+                            }
                         )
+
+                        if (prefs.saveMediaEnabled) {
+                            Spacer(Modifier.height(6.dp))
+                            SettingStatusRow(
+                                title = "Saved media files",
+                                detail = if (mediaStats.first == 0) "0 files" else "${mediaStats.first} files · ${formatBytes(mediaStats.second)}",
+                                positive = mediaStats.first > 0
+                            )
+                            if (statusText != null) {
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    statusText,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (statusText.startsWith("Media saving is enabled") || statusText.startsWith("Photo/video")) {
+                                        MaterialTheme.colorScheme.error
+                                    } else {
+                                        MaterialTheme.colorScheme.primary
+                                    }
+                                )
+                            }
+                            if (mediaPermissionDenied) {
+                                Spacer(Modifier.height(6.dp))
+                                OutlinedButton(
+                                    onClick = {
+                                        runCatching {
+                                            context.startActivity(
+                                                Intent(
+                                                    android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                                    android.net.Uri.parse("package:${context.packageName}")
+                                                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                            )
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) { Text("Open App Settings") }
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = { mediaActionScanBusy = true },
+                                    enabled = permissionReady && !mediaActionScanBusy,
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) { Text(if (mediaActionScanBusy) "Scanning…" else "Scan Now") }
+
+                                OutlinedButton(
+                                    onClick = onOpenSavedMedia,
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) { Text("View Media") }
+                            }
+                            if (mediaStats.first > 0) {
+                                Spacer(Modifier.height(6.dp))
+                                TextButton(
+                                    onClick = { mediaActionConfirmClear = true },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                                ) { Text("Clear All Saved Media") }
+                            }
+                        }
                     }
-                    if (statusText != null) {
-                        Text(
-                            statusText,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (statusText.startsWith("Media saving is on") || statusText.startsWith("Photo/video")) {
-                                MaterialTheme.colorScheme.error
-                            } else {
-                                MaterialTheme.colorScheme.primary
-                            },
-                            modifier = Modifier.padding(bottom = 6.dp)
-                        )
-                    }
-                    if (mediaPermissionDenied) {
-                        OutlinedButton(
-                            onClick = {
-                                runCatching {
-                                    context.startActivity(
-                                        Intent(
-                                            android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                            android.net.Uri.parse("package:${context.packageName}")
-                                        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    )
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
-                        ) { Text("Open Android app settings") }
-                    }
-                    SettingStatus(
-                        "Saved media",
-                        if (mediaStats.first == 0) "0 files" else "${mediaStats.first} files · ${formatBytes(mediaStats.second)}",
-                        mediaStats.first > 0
-                    )
-                    if (prefs.saveMediaEnabled) {
-                        OutlinedButton(
-                            onClick = { mediaActionScanBusy = true },
-                            enabled = permissionReady && !mediaActionScanBusy,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 8.dp)
-                        ) { Text(if (mediaActionScanBusy) "Scanning…" else "Scan now") }
-                    }
-                    OutlinedButton(
-                        onClick = onOpenSavedMedia,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp)
-                    ) { Text("View saved media") }
-                    OutlinedButton(
-                        onClick = { mediaActionConfirmClear = true },
-                        enabled = mediaStats.first > 0,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp)
-                    ) { Text("Clear all saved media") }
-                    Text(
-                        "Saved media never goes into encrypted exports and can't reach view-once content.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.padding(top = 6.dp)
-                    )
                 }
             }
 
+            // Group 3: Privacy & Security
             item {
-                SettingsCard(Icons.Outlined.PrivacyTip, "Privacy & retention") {
+                SettingsGroup(icon = Icons.Outlined.PrivacyTip, title = "Privacy & Security") {
                     SettingSwitch(
                         title = "Auto-copy verification codes",
-                        subtitle = "Automatically copy OTPs to clipboard when notifications arrive.",
+                        subtitle = "Automatically copy 2FA OTP codes to clipboard upon notification arrival.",
                         checked = prefs.autoCopyOtp,
                         onChecked = viewModel::setAutoCopyOtp
                     )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+
+                    SettingSwitch(
+                        title = "Hide sensitive previews",
+                        subtitle = "Mask OTP verification codes and financial account details in alert lists.",
+                        checked = prefs.hideSensitivePreviews,
+                        onChecked = viewModel::setHideSensitivePreviews
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+
+                    SettingSwitch(
+                        title = "Smart Bank & UPI Expense Tracker",
+                        subtitle = "Derive offline expense transaction summaries from bank SMS and UPI notifications.",
+                        checked = prefs.expenseTrackerEnabled,
+                        onChecked = viewModel::setExpenseTrackerEnabled
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+
                     SettingSwitch(
                         title = "App lock",
-                        subtitle = if (deviceSecure) {
-                            "Require your device screen lock whenever you return to NotiFlow."
-                        } else {
-                            "Set a device screen lock first, then enable app lock here."
-                        },
+                        subtitle = if (deviceSecure) "Require your device screen lock or fingerprint when opening NotiFlow."
+                        else "Set up an Android screen lock first to enable app lock.",
                         checked = prefs.appLockEnabled,
                         enabled = deviceSecure,
                         onChecked = viewModel::setAppLockEnabled
                     )
-                    Text(
-                        "Captured notification history remains available after a source notification disappears. Android removal callbacks do not reliably prove that a sender used “Delete for everyone”.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(vertical = 7.dp)
-                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+
                     SettingSwitch(
-                        title = "Smart Bank & UPI Expense Tracker",
-                        subtitle = "When enabled, derive supported transaction records from new notifications on-device. Turning this off stops new parsing; existing derived rows remain until you delete history.",
-                        checked = prefs.expenseTrackerEnabled,
-                        onChecked = viewModel::setExpenseTrackerEnabled
-                    )
-                    SettingSwitch(
-                        title = "Hide sensitive previews",
-                        subtitle = "Mask OTP and financial content inside NotiFlow list views.",
-                        checked = prefs.hideSensitivePreviews,
-                        onChecked = viewModel::setHideSensitivePreviews
-                    )
-                    SettingSwitch(
-                        title = "Automatic cleanup",
-                        subtitle = "Remove stale history while protecting pinned and pending reminder items.",
+                        title = "Automatic history cleanup",
+                        subtitle = "Remove stale alerts older than retention period while preserving pinned and reminder items.",
                         checked = prefs.autoCleanupEnabled,
                         onChecked = viewModel::setAutoCleanup
                     )
+
                     if (prefs.autoCleanupEnabled) {
-                        Text("Retention", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 12.dp))
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(listOf(7, 30, 90, 180)) { days ->
-                                FilterChip(
-                                    selected = prefs.retentionDays == days,
-                                    onClick = { viewModel.setRetentionDays(days) },
-                                    label = { Text("$days days") }
-                                )
-                            }
-                        }
-                        OutlinedButton(
-                            onClick = { viewModel.runCleanupNow() },
-                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-                        ) { Text("Clean old history now") }
-                    }
-
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedButton(
-                        onClick = onOpenPrivacy,
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-                    ) {
-                        Icon(Icons.Outlined.PrivacyTip, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Privacy Policy")
-                    }
-                }
-            }
-
-            item {
-                SettingsCard(Icons.Outlined.Security, "Learned preferences") {
-                    val learned = prefs.learnedPreferences()
-                    if (learned.isEmpty()) {
-                        Text("No corrections learned yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    } else {
-                        Text(
-                            "NotiFlow remembers corrections by source and sender. You can remove any rule.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        learned.take(20).forEach { rule ->
-                            Row(
-                                Modifier.fillMaxWidth().padding(vertical = 7.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(Modifier.weight(1f)) {
-                                    Text(rule.packageName, fontWeight = FontWeight.Medium)
-                                    Text(
-                                        listOfNotNull(rule.sender, rule.category?.label, rule.priority?.label).joinToString(" · "),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        Column {
+                            Text("Retention period", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.height(6.dp))
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                items(listOf(7, 30, 90, 180)) { days ->
+                                    FilterChip(
+                                        selected = prefs.retentionDays == days,
+                                        onClick = { viewModel.setRetentionDays(days) },
+                                        label = { Text("$days days") }
                                     )
                                 }
-                                IconButton(onClick = { viewModel.removeLearnedPreference(rule.key) }) {
-                                    Icon(Icons.Outlined.Delete, contentDescription = "Delete rule")
-                                }
                             }
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = { viewModel.runCleanupNow() },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp)
+                            ) { Text("Clean Stale History Now") }
                         }
                     }
-                }
-            }
 
-            item {
-                SettingsCard(Icons.Outlined.Storage, "Local data") {
-                    SettingStatus("Saved notifications", "${storage.first} items", storage.first > 0)
-                    Spacer(Modifier.height(8.dp))
-                    SettingStatus("Storage consumed", formatBytes(storage.second), true)
-                    Spacer(Modifier.height(14.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
 
-                    Button(
-                        onClick = { backupDialog = true },
+                    OutlinedButton(
+                        onClick = onOpenPrivacy,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("Export password-protected archive", fontWeight = FontWeight.Bold)
+                        Icon(Icons.Outlined.PrivacyTip, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("View Privacy Policy")
                     }
+                }
+            }
 
-                    Spacer(Modifier.height(10.dp))
+            // Group 4: Advanced & Diagnostics
+            item {
+                SettingsGroup(icon = Icons.Outlined.Storage, title = "Advanced & Diagnostics") {
+                    SettingStatusRow(
+                        title = "Encrypted Local Storage",
+                        detail = "${storage.first} notifications stored · ${formatBytes(storage.second)}",
+                        positive = storage.first > 0
+                    )
 
-                    OutlinedButton(
-                        onClick = { restoreLauncher.launch(arrayOf("*/*")) },
-                        modifier = Modifier.fillMaxWidth()
+                    Spacer(Modifier.height(4.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("Restore encrypted archive")
+                        Button(
+                            onClick = { backupDialog = true },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) { Text("Export Backup") }
+
+                        OutlinedButton(
+                            onClick = { restoreLauncher.launch(arrayOf("*/*")) },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) { Text("Restore") }
                     }
 
                     restoreMessage?.let {
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            it,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                     }
 
-                    Spacer(Modifier.height(10.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
 
-                    OutlinedButton(onClick = { clearConfirm = true }, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Outlined.Delete, contentDescription = null)
-                        Text(" Delete all NotiFlow history")
+                    // Service connection & diagnostics
+                    val connectionText = when {
+                        !listenerEnabled -> "Permission Revoked"
+                        isServiceConnected -> "Connected & Active"
+                        else -> "Disconnected (Standby)"
+                    }
+                    val connectionPositive = listenerEnabled && isServiceConnected
+                    SettingStatusRow(
+                        title = "Listener service status",
+                        detail = connectionText,
+                        positive = connectionPositive
+                    )
+
+                    val lastCapturedText = remember(lastCapturedTimestamp) {
+                        formatCapturedTimestamp(lastCapturedTimestamp)
+                    }
+                    Text(
+                        "Last notification: $lastCapturedText",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                val rebindRequested = NotiFlowNotificationListener.requestRebindSafely(context)
+                                rebindStatusMessage = if (rebindRequested) {
+                                    "Service rebind requested."
+                                } else {
+                                    "Rebind throttled (cooldown active). Toggle notification access if issues persist."
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(15.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Reconnect")
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                exportingDiagnostics = true
+                                scope.launch {
+                                    runCatching {
+                                        val file = DiagnosticsExporter.exportDiagnosticsToFile(context)
+                                        DiagnosticsExporter.shareDiagnostics(context, file)
+                                    }
+                                    exportingDiagnostics = false
+                                }
+                            },
+                            enabled = !exportingDiagnostics,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Outlined.Share, contentDescription = null, modifier = Modifier.size(15.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(if (exportingDiagnostics) "Exporting…" else "Diagnostics")
+                        }
+                    }
+
+                    rebindStatusMessage?.let { msg ->
+                        Text(msg, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    }
+
+                    Text(
+                        "Diagnostics contain 0% PII. Strictly on-device service health & metadata for troubleshooting.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+
+                    // Learned preferences
+                    val learned = prefs.learnedPreferences()
+                    if (learned.isNotEmpty()) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+                        Column {
+                            Text("Learned Corrections (${learned.size})", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            Spacer(Modifier.height(4.dp))
+                            learned.take(15).forEach { rule ->
+                                Row(
+                                    Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(rule.packageName, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
+                                        Text(
+                                            listOfNotNull(rule.sender, rule.category?.label, rule.priority?.label).joinToString(" · "),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    IconButton(onClick = { viewModel.removeLearnedPreference(rule.key) }) {
+                                        Icon(Icons.Outlined.Delete, contentDescription = "Delete rule", modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+
+                    // Danger zone
+                    OutlinedButton(
+                        onClick = { clearConfirm = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Delete all NotiFlow history")
                     }
                 }
             }
@@ -1034,34 +1094,44 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun SettingsCard(
+private fun SettingsGroup(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.padding(horizontal = 2.dp),
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(19.dp)
+                modifier = Modifier.size(20.dp)
             )
             Text(
                 title,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
             )
         }
-        Spacer(Modifier.height(10.dp))
-        content()
-        Spacer(Modifier.height(14.dp))
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer
+            ),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                content = content
+            )
+        }
     }
 }
 
@@ -1074,25 +1144,64 @@ private fun SettingSwitch(
     onChecked: (Boolean) -> Unit
 ) {
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 7.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(enabled = enabled) { onChecked(!checked) }
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(Modifier.weight(1f)) {
-            Text(title, fontWeight = FontWeight.Medium)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 12.dp)
+        ) {
+            Text(
+                title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+                color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline
+            )
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
         Switch(checked = checked, onCheckedChange = onChecked, enabled = enabled)
     }
 }
 
 @Composable
-private fun SettingStatus(title: String, detail: String, positive: Boolean) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text(title, fontWeight = FontWeight.Medium)
-            Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun SettingStatusRow(
+    title: String,
+    detail: String,
+    positive: Boolean,
+    actionButton: (@Composable () -> Unit)? = null
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 8.dp)
+            ) {
+                Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            MetaPill(
+                text = if (positive) "Ready" else "Needs attention",
+                emphasized = positive,
+                isWarning = !positive
+            )
         }
-        MetaPill(if (positive) "Ready" else "Needs attention", emphasized = positive)
+        if (actionButton != null) {
+            Spacer(Modifier.height(8.dp))
+            actionButton()
+        }
     }
 }
 

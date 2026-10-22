@@ -146,16 +146,19 @@ fun NotificationCard(
         } else null
     }
 
+    val dark = LocalNotiFlowDarkTheme.current
     val cardBorder = if (selected) {
         BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
     } else if (isHighPriority) {
-        BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
-    } else null
-
-    val containerColor = if (isHighPriority) {
-        MaterialTheme.colorScheme.surfaceContainer
+        BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.45f))
     } else {
-        MaterialTheme.colorScheme.surfaceContainerLow
+        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+    }
+
+    val containerColor = if (dark) {
+        if (isHighPriority) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainer
+    } else {
+        if (isHighPriority) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceContainerLowest
     }
 
     Card(
@@ -164,7 +167,8 @@ fun NotificationCard(
             .fillMaxWidth()
             .animateContentSize(),
         colors = CardDefaults.cardColors(containerColor = containerColor),
-        shape = RoundedCornerShape(14.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp, pressedElevation = 2.dp),
+        shape = RoundedCornerShape(16.dp),
         border = cardBorder
     ) {
         Row(
@@ -270,6 +274,13 @@ fun NotificationCard(
 
                 if (extractedOtp != null) {
                     Spacer(Modifier.height(10.dp))
+                    val displayOtp = remember(extractedOtp) {
+                        if (extractedOtp.length in listOf(6, 8)) {
+                            extractedOtp.chunked(extractedOtp.length / 2).joinToString(" ")
+                        } else {
+                            extractedOtp
+                        }
+                    }
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = Color(0xFF10B981).copy(alpha = 0.14f),
@@ -290,18 +301,22 @@ fun NotificationCard(
                                 modifier = Modifier.size(15.dp)
                             )
                             Text(
-                                text = extractedOtp,
+                                text = displayOtp,
                                 style = MaterialTheme.typography.titleSmall.copy(
                                     fontWeight = FontWeight.Bold,
                                     fontFamily = FontFamily.Monospace,
                                     letterSpacing = 1.sp
                                 ),
-                                color = if (LocalNotiFlowDarkTheme.current) Color(0xFF6EE7B7) else Color(0xFF047857)
+                                color = if (LocalNotiFlowDarkTheme.current) Color(0xFF6EE7B7) else Color(0xFF047857),
+                                maxLines = 1,
+                                softWrap = false
                             )
                             Text(
-                                text = "• Auto-copied (tap to re-copy)",
+                                text = "• Tap to copy",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
@@ -439,20 +454,26 @@ fun NotificationCard(
                     if (!selectionMode && (onQuickRemind != null || onQuickDone != null || onQuickTogglePin != null)) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             if (onQuickRemind != null) {
                                 Box {
-                                    IconButton(
-                                        onClick = { remindMenuExpanded = true },
-                                        modifier = Modifier.size(32.dp)
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f),
+                                        modifier = Modifier.size(36.dp)
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.Schedule,
-                                            contentDescription = "Remind me",
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(16.dp)
-                                        )
+                                        IconButton(
+                                            onClick = { remindMenuExpanded = true },
+                                            modifier = Modifier.size(36.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.Schedule,
+                                                contentDescription = "Remind me",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
                                     }
                                     DropdownMenu(
                                         expanded = remindMenuExpanded,
@@ -538,30 +559,42 @@ fun NotificationCard(
                             }
 
                             if (onQuickTogglePin != null) {
-                                IconButton(
-                                    onClick = onQuickTogglePin,
-                                    modifier = Modifier.size(32.dp)
+                                Surface(
+                                    shape = CircleShape,
+                                    color = if (item.pinned) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(36.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.PushPin,
-                                        contentDescription = if (item.pinned) "Unpin" else "Pin",
-                                        tint = if (item.pinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(16.dp)
-                                    )
+                                    IconButton(
+                                        onClick = onQuickTogglePin,
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.PushPin,
+                                            contentDescription = if (item.pinned) "Unpin" else "Pin",
+                                            tint = if (item.pinned) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
                                 }
                             }
 
                             if (onQuickDone != null && item.state != com.premraj.notiflow.data.NotificationState.DONE) {
-                                IconButton(
-                                    onClick = onQuickDone,
-                                    modifier = Modifier.size(32.dp)
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(36.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.CheckCircle,
-                                        contentDescription = "Mark Done",
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(16.dp)
-                                    )
+                                    IconButton(
+                                        onClick = onQuickDone,
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.CheckCircle,
+                                            contentDescription = "Mark Done",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -577,34 +610,62 @@ fun AppBadge(appName: String, modifier: Modifier = Modifier) {
     val initials = appName.split(Regex("\\s+")).filter { it.isNotBlank() }.take(2)
         .joinToString("") { it.first().uppercase() }.ifBlank { "N" }
 
+    val hash = appName.hashCode()
+    val palette = listOf(
+        Color(0xFF2563EB) to Color(0xFFDBEAFE), // Blue
+        Color(0xFF4F46E5) to Color(0xFFE0E7FF), // Indigo
+        Color(0xFF7C3AED) to Color(0xFFEDE9FE), // Purple
+        Color(0xFF0891B2) to Color(0xFFCFFAFE), // Cyan
+        Color(0xFF059669) to Color(0xFFD1FAE5), // Emerald
+        Color(0xFFD97706) to Color(0xFFFEF3C7), // Amber
+        Color(0xFFDB2777) to Color(0xFFFCE7F3)  // Pink
+    )
+    val dark = LocalNotiFlowDarkTheme.current
+    val colorIndex = (hash and 0x7FFFFFFF) % palette.size
+    val colorPair = palette[colorIndex]
+    val bgColor = if (dark) colorPair.first.copy(alpha = 0.25f) else colorPair.second
+    val textColor = if (dark) colorPair.first.copy(alpha = 0.95f) else colorPair.first
+
     Box(
         modifier = modifier
-            .size(40.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+            .size(38.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(bgColor),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = initials,
-            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+            color = textColor
         )
     }
 }
 
 @Composable
-fun MetaPill(text: String, emphasized: Boolean = false) {
+fun MetaPill(
+    text: String,
+    emphasized: Boolean = false,
+    isWarning: Boolean = false
+) {
+    val containerColor = when {
+        isWarning -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.65f)
+        emphasized -> MaterialTheme.colorScheme.primaryContainer
+        else -> MaterialTheme.colorScheme.surfaceContainerHighest
+    }
+    val contentColor = when {
+        isWarning -> MaterialTheme.colorScheme.error
+        emphasized -> MaterialTheme.colorScheme.onPrimaryContainer
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
     Surface(
         shape = RoundedCornerShape(100.dp),
-        color = if (emphasized) MaterialTheme.colorScheme.primaryContainer
-        else MaterialTheme.colorScheme.surfaceContainerHighest
+        color = containerColor
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
-            color = if (emphasized) MaterialTheme.colorScheme.onPrimaryContainer
-            else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+            color = contentColor,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
             maxLines = 1
         )
     }

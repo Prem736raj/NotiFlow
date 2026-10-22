@@ -17,6 +17,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -79,8 +80,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLocale
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.premraj.notiflow.data.NotificationCategory
@@ -117,8 +120,16 @@ fun DetailScreen(
     var categoryMenu by remember { mutableStateOf(false) }
     var priorityMenu by remember { mutableStateOf(false) }
     var deleteConfirm by remember { mutableStateOf(false) }
+    var showSensitiveContent by remember { mutableStateOf(!hideSensitive) }
     val smartActions = remember(item.id, item.title, item.body, item.category, item.state) { ActionExtractor.extract(item) }
     val extractedOtp = remember(item.id, item.title, item.body) { ActionExtractor.extractOtpCode(item.title, item.body) }
+    val filteredSmartActions = remember(smartActions, extractedOtp) {
+        smartActions.filter { action ->
+            if (extractedOtp != null && action is SmartAction.CopyCode) false
+            else if (action is SmartAction.CreateReminder) false
+            else true
+        }
+    }
     val categoryStyle = getCategoryStyle(item.category)
 
     if (deleteConfirm) {
@@ -140,7 +151,12 @@ fun DetailScreen(
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-                title = { Text(item.appName, maxLines = 1, fontWeight = FontWeight.Bold) },
+                title = {
+                    Column {
+                        Text(item.appName, maxLines = 1, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                        Text(relativeTime(item.postedAt), maxLines = 1, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                },
                 navigationIcon = {
                     Surface(
                         shape = CircleShape,
@@ -225,19 +241,47 @@ fun DetailScreen(
                                 )
                             }
 
-                            Spacer(Modifier.height(10.dp))
+                            Spacer(Modifier.height(8.dp))
 
-                            Text(
-                                text = extractedOtp.chunked(3).joinToString("  "),
-                                style = MaterialTheme.typography.displayMedium.copy(
-                                    fontWeight = FontWeight.Black,
-                                    fontFamily = FontFamily.Monospace,
-                                    letterSpacing = 3.sp
-                                ),
-                                color = if (dark) Color(0xFFECFDF5) else Color(0xFF064E3B)
-                            )
+                            val formattedOtp = remember(extractedOtp) {
+                                when {
+                                    extractedOtp.length == 8 -> extractedOtp.chunked(4).joinToString(" ")
+                                    extractedOtp.length == 6 -> extractedOtp.chunked(3).joinToString(" ")
+                                    extractedOtp.length == 4 -> extractedOtp.chunked(2).joinToString(" ")
+                                    extractedOtp.length % 3 == 0 -> extractedOtp.chunked(3).joinToString(" ")
+                                    extractedOtp.length % 2 == 0 -> extractedOtp.chunked(extractedOtp.length / 2).joinToString(" ")
+                                    else -> extractedOtp
+                                }
+                            }
 
-                            Spacer(Modifier.height(6.dp))
+                            BoxWithConstraints(
+                                modifier = Modifier.fillMaxWidth(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                val baseFontSize = when {
+                                    extractedOtp.length <= 4 -> 34.sp
+                                    extractedOtp.length <= 6 -> 28.sp
+                                    extractedOtp.length <= 8 -> 22.sp
+                                    else -> 18.sp
+                                }
+                                val effectiveFontSize = if (maxWidth < 280.dp) (baseFontSize.value * 0.85f).sp else baseFontSize
+
+                                Text(
+                                    text = formattedOtp,
+                                    style = TextStyle(
+                                        fontSize = effectiveFontSize,
+                                        fontWeight = FontWeight.Black,
+                                        fontFamily = FontFamily.Monospace,
+                                        letterSpacing = if (extractedOtp.length <= 6) 2.5.sp else 1.sp,
+                                        textAlign = TextAlign.Center
+                                    ),
+                                    color = if (dark) Color(0xFFECFDF5) else Color(0xFF064E3B),
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            }
+
+                            Spacer(Modifier.height(8.dp))
 
                             Text(
                                 text = if (autoCopyOtp) {
@@ -478,11 +522,40 @@ fun DetailScreen(
 
                         Spacer(Modifier.height(10.dp))
 
-                        Text(
-                            text = visibleBody(item, hideSensitive),
-                            style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 24.sp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        if (hideSensitive && !showSensitiveContent) {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showSensitiveContent = true }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.Security,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "Sensitive preview masked · Tap to reveal message",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        } else {
+                            Text(
+                                text = item.displayBody,
+                                style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 24.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
 
                         Spacer(Modifier.height(16.dp))
 
@@ -519,13 +592,13 @@ fun DetailScreen(
                 }
             }
 
-            // Useful Actions
-            if (smartActions.isNotEmpty()) {
+            // Quick Actions
+            if (filteredSmartActions.isNotEmpty()) {
                 item {
-                    Text("Useful actions", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("Quick Actions", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(8.dp))
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        items(smartActions, key = { it.label + it.hashCode() }) { action ->
+                        items(filteredSmartActions, key = { it.label + it.hashCode() }) { action ->
                             val icon = when (action) {
                                 is SmartAction.CopyCode -> Icons.Outlined.ContentCopy
                                 is SmartAction.OpenUrl -> Icons.AutoMirrored.Outlined.OpenInNew
@@ -542,7 +615,7 @@ fun DetailScreen(
                                         executeSmartAction(context, item, action)
                                     }
                                 },
-                                shape = RoundedCornerShape(14.dp)
+                                shape = RoundedCornerShape(12.dp)
                             ) {
                                 Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
@@ -553,52 +626,51 @@ fun DetailScreen(
                 }
             }
 
-            // Deal with it (Triage)
+            // Triage & Actions
             item {
-                Text("Deal with it", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("Triage & Actions", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (item.state == NotificationState.DONE || item.state == NotificationState.ARCHIVED) {
-                        item {
-                            Button(
-                                onClick = { onStateChange(NotificationState.ACTIVE) },
-                                shape = RoundedCornerShape(14.dp)
-                            ) {
-                                Icon(Icons.Outlined.Restore, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("Restore to inbox")
-                            }
+                if (item.state == NotificationState.DONE || item.state == NotificationState.ARCHIVED) {
+                    Button(
+                        onClick = { onStateChange(NotificationState.ACTIVE) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Outlined.Restore, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Restore to inbox")
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { onStateChange(NotificationState.DONE) },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Outlined.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Done")
                         }
-                    } else {
-                        item {
-                            Button(
-                                onClick = { showDateTimePicker(context) { onSetReminder(it) } },
-                                shape = RoundedCornerShape(14.dp)
-                            ) {
-                                Icon(Icons.Outlined.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text(if (item.state == NotificationState.LATER) "Reschedule" else "Remind later")
-                            }
+                        OutlinedButton(
+                            onClick = { showDateTimePicker(context) { onSetReminder(it) } },
+                            modifier = Modifier.weight(1.15f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Outlined.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(if (item.state == NotificationState.LATER) "Reschedule" else "Remind later")
                         }
-                        item {
-                            OutlinedButton(
-                                onClick = { onStateChange(NotificationState.DONE) },
-                                shape = RoundedCornerShape(14.dp)
-                            ) {
-                                Icon(Icons.Outlined.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("Done")
-                            }
-                        }
-                        item {
-                            OutlinedButton(
-                                onClick = { onStateChange(NotificationState.ARCHIVED) },
-                                shape = RoundedCornerShape(14.dp)
-                            ) {
-                                Icon(Icons.Outlined.Archive, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("Archive")
-                            }
+                        OutlinedButton(
+                            onClick = { onStateChange(NotificationState.ARCHIVED) },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Outlined.Archive, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Archive")
                         }
                     }
                 }
@@ -636,7 +708,7 @@ fun DetailScreen(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
                 ) {
                     Column(Modifier.padding(18.dp)) {
-                        Text("Classification & Priority", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("Intelligence & Rules", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(12.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Box {
@@ -714,46 +786,43 @@ fun DetailScreen(
                         }
 
                         // Direct 1-tap correction actions
-                        Text("Direct corrections", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-                        Spacer(Modifier.height(6.dp))
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            if (item.priority != NotificationPriority.HIGH) {
-                                item {
-                                    OutlinedButton(
-                                        onClick = { onPriorityChange(NotificationPriority.HIGH) },
-                                        shape = RoundedCornerShape(10.dp)
-                                    ) {
-                                        Text("Always treat as Important")
+                        val hasCorrections = item.priority != NotificationPriority.HIGH ||
+                            item.category == NotificationCategory.PROMOTION ||
+                            item.category == NotificationCategory.SPAM ||
+                            item.expenseTransaction != null
+
+                        if (hasCorrections) {
+                            Text("Direct corrections", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                            Spacer(Modifier.height(6.dp))
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                if (item.priority != NotificationPriority.HIGH) {
+                                    item {
+                                        OutlinedButton(
+                                            onClick = { onPriorityChange(NotificationPriority.HIGH) },
+                                            shape = RoundedCornerShape(10.dp)
+                                        ) {
+                                            Text("Always treat as Important")
+                                        }
                                     }
                                 }
-                            }
-                            if (item.category == NotificationCategory.PROMOTION || item.category == NotificationCategory.SPAM) {
-                                item {
-                                    OutlinedButton(
-                                        onClick = { onCategoryChange(NotificationCategory.MESSAGE) },
-                                        shape = RoundedCornerShape(10.dp)
-                                    ) {
-                                        Text("Not a promotion")
+                                if (item.category == NotificationCategory.PROMOTION || item.category == NotificationCategory.SPAM) {
+                                    item {
+                                        OutlinedButton(
+                                            onClick = { onCategoryChange(NotificationCategory.MESSAGE) },
+                                            shape = RoundedCornerShape(10.dp)
+                                        ) {
+                                            Text("Not a promotion")
+                                        }
                                     }
                                 }
-                            }
-                            if (item.expenseTransaction != null) {
-                                item {
-                                    OutlinedButton(
-                                        onClick = onRemoveExpense,
-                                        shape = RoundedCornerShape(10.dp)
-                                    ) {
-                                        Text("Not an expense")
-                                    }
-                                }
-                            }
-                            if (!item.isVip) {
-                                item {
-                                    OutlinedButton(
-                                        onClick = { onVipChange(true) },
-                                        shape = RoundedCornerShape(10.dp)
-                                    ) {
-                                        Text("Make VIP")
+                                if (item.expenseTransaction != null) {
+                                    item {
+                                        OutlinedButton(
+                                            onClick = onRemoveExpense,
+                                            shape = RoundedCornerShape(10.dp)
+                                        ) {
+                                            Text("Not an expense")
+                                        }
                                     }
                                 }
                             }
@@ -779,7 +848,7 @@ fun DetailScreen(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
                 ) {
                     Column(Modifier.padding(18.dp)) {
-                        Text("Source App", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("Source App & Data", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(12.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             OutlinedButton(

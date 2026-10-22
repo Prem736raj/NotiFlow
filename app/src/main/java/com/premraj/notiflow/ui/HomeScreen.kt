@@ -264,6 +264,30 @@ fun HomeScreen(
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
+                                val liveColor = if (listenerEnabled) Color(0xFF4CC58F) else Color(0xFFF59E0B)
+                                Surface(
+                                    shape = RoundedCornerShape(50),
+                                    color = liveColor.copy(alpha = 0.15f)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    ) {
+                                        Box(
+                                            Modifier
+                                                .size(7.dp)
+                                                .clip(CircleShape)
+                                                .background(liveColor)
+                                        )
+                                        Text(
+                                            if (listenerEnabled) "Capturing" else "Paused",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = liveColor
+                                        )
+                                    }
+                                }
                             }
                             Text(
                                 text = when (selectedSection) {
@@ -750,12 +774,20 @@ private fun SectionChip(
                 else MaterialTheme.colorScheme.onSurfaceVariant
             )
             count?.let {
-                Text(
-                    text = it.toString(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                    else MaterialTheme.colorScheme.outline
-                )
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = (if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                    else MaterialTheme.colorScheme.onSurfaceVariant).copy(alpha = 0.14f)
+                ) {
+                    Text(
+                        text = it.toString(),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 1.dp)
+                    )
+                }
             }
         }
     }

@@ -31,12 +31,15 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.PlayCircle
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -72,12 +75,14 @@ import java.util.Locale
 @Composable
 fun SavedMediaScreen(
     viewModel: NotiFlowViewModel,
+    onOpenNotification: (Long) -> Unit,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
     val media by viewModel.savedMedia.collectAsStateWithLifecycle()
     val stats by viewModel.savedMediaStats.collectAsStateWithLifecycle()
     val message = viewModel.mediaScanMessage.collectAsStateWithLifecycle().value
+    var clearConfirm by remember { mutableStateOf(false) }
 
     val dateFormat = remember { SimpleDateFormat("MMM d, yyyy · h:mm a", Locale.US) }
 
@@ -110,6 +115,12 @@ fun SavedMediaScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+            },
+            actions = {
+                TextButton(
+                    enabled = media.isNotEmpty(),
+                    onClick = { clearConfirm = true }
+                ) { Text("Clear all") }
             }
         )
 
@@ -119,6 +130,28 @@ fun SavedMediaScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+            )
+        }
+
+        if (clearConfirm) {
+            AlertDialog(
+                onDismissRequest = { clearConfirm = false },
+                title = { Text("Delete all saved media?") },
+                text = {
+                    Text("This permanently removes every private photo/video copy inside NotiFlow. The originals in WhatsApp's folders are untouched.")
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            viewModel.clearSavedMedia()
+                            clearConfirm = false
+                        },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) { Text("Delete") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { clearConfirm = false }) { Text("Cancel") }
+                }
             )
         }
 
@@ -158,11 +191,15 @@ fun SavedMediaScreen(
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(media, key = { it.id }) { item ->
+                    val onOpenLinked = item.notificationId?.let { linkedId ->
+                        { onOpenNotification(linkedId) }
+                    }
                     SavedMediaTile(
                         item = item,
                         dateLabel = dateFormat.format(Date(item.capturedAt)),
                         onClick = { openSavedMedia(context, item) },
-                        onDelete = { viewModel.deleteSavedMedia(item.id, item.savedPath) }
+                        onDelete = { viewModel.deleteSavedMedia(item.id, item.savedPath) },
+                        onOpenLinked = onOpenLinked
                     )
                 }
             }
@@ -175,11 +212,12 @@ private fun SavedMediaTile(
     item: SavedMedia,
     dateLabel: String,
     onClick: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onOpenLinked: (() -> Unit)? = null
 ) {
     var preview by remember(item.id) { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(item.id, item.savedPath) {
-        preview = withContext(Dispatchers.IO) { decodePreview(File(item.savedPath)) }
+        preview = withContext(Dispatchers.IO) { decodePreview(File(item.savedPath), item.kind) }
     }
 
     Surface(
@@ -262,13 +300,49 @@ private fun SavedMediaTile(
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                onOpenLinked?.let { open ->
+                    Text(
+                        "Open linked alert",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .padding(top = 2.dp)
+                            .clickable(onClick = open)
+                    )
+                }
             }
         }
     }
 }
 
-private fun decodePreview(file: File): ImageBitmap? = runCatching {
+private fun decodePreview(file: File, kind: SavedMediaKind): ImageBitmap? = runCatching {
     if (!file.isFile) return@runCatching null
+    if (kind == SavedMediaKind.VIDEO) {
+        val decoder = android.media.MediaMetadataRetriever()
+        try {
+            decoder.setDataSource(file.absolutePath)
+            val frame = decoder.getFrameAtTime(
+                0,
+                android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC
+            ) ?: return@runCatching null
+            val widthLimit = 640
+            val bitmap = if (frame.width > widthLimit) {
+                val scaled = Bitmap.createScaledBitmap(
+                    frame,
+                    widthLimit,
+                    (frame.height * (widthLimit.toFloat() / frame.width)).toInt().coerceAtLeast(1),
+                    true
+                )
+                if (scaled != frame) frame.recycle()
+                scaled
+            } else {
+                frame
+            }
+            return@runCatching bitmap.asImageBitmap()
+        } finally {
+            decoder.release()
+        }
+    }
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeFile(file.absolutePath, bounds)
     if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@runCatching null

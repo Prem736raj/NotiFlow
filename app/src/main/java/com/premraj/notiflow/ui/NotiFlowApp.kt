@@ -57,6 +57,11 @@ fun NotiFlowApp(
     if (savedMediaOpen) {
         SavedMediaScreen(
             viewModel = viewModel,
+            onOpenNotification = { linkedId ->
+                savedMediaOpen = false
+                detailId = linkedId
+                screen = AppScreen.DETAIL.name
+            },
             onBack = { savedMediaOpen = false }
         )
         return

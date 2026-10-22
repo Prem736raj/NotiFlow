@@ -19,7 +19,7 @@ This file is a status index, not proof. Runtime/build proof must come from CI, t
 | 13 | 🟡 Partial | rule-based natural-language interpretation exists; do not describe it as semantic vector search |
 | 14 | ⚠️ Guarded | retention/cleanup exists; destructive broad “%off%” deletion was removed |
 | 15 | 🟡 Partial | in-app offline policy, safe defaults, archive restore, and device-credential app lock exist; DB-at-rest threat model remains |
-| 16 | ✅ CI passed | GitHub Actions run 36440635850 verified testDebugUnitTest, lintDebug, assembleDebug in 5m 3s; current bundle re-verified locally on 22 October 2026 with 82 tests across 13 suites, lintDebug, and assembleDebug |
+| 16 | ✅ CI passed | GitHub Actions run 39756707962 passed verify (unit tests, lint, debug/release builds, non-debug certificate check) and instrumented jobs on 22 October 2026; local suite has 82 tests across 13 suites |
 | 17 | Source-verified | keyword automation rules for pin, high priority, and auto-archive are applied during capture; storage/matching tests pass |
 | 18 | Source-verified | multi-select Done, one-hour snooze, Archive, and Delete are wired through bulk store operations |
 | 19 | Insufficiently tested | aggregate-count home-screen widget compiles and updates from store changes; launcher behavior needs device verification |

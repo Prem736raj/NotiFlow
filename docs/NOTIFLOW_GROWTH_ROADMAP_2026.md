@@ -4,7 +4,7 @@
 **Repository:** Prem736raj/NotiFlow, branch main, inspected commit ef64d88d0585fc1a70a00845ba798dae7f939d77  
 **Product:** Android app com.premraj.notiflow, version 0.1.0  
 **Audience:** solo developer / early beta team  
-**Status of this file:** actionable assessment and proposal; no production release, Google Play Console change, or hosted policy deployment is implied.
+**Status of this file:** actionable assessment and proposal; no production release or Google Play Console change is implied. Hosted-policy deployment status is recorded below.
 
 ## 1. Executive decision
 
@@ -14,7 +14,7 @@
 
 **Launch decision:** Do not submit the currently generated release AAB to a production track. Complete the P0 gates, then run a real-device beta before expanding acquisition.
 
-**Implementation progress (22 October 2026, local changes pending commit):** The release-signing debug fallback was removed, a signing prerequisite added to release packaging, CI configured to build with a short-lived test-only certificate, and the public-only Pages workflow added. The inactive local AI/model, Focus Mode, Smart Presets, voice reader, unwanted-cleanup prompt, and anti-revoke toggle were removed; the policy is embedded in-app; encrypted archive restore and device-credential app lock were added. The current work adds on-device keyword automation rules (pin, high priority, auto-archive), multi-select bulk triage, archive support for automation rules, and an aggregate-count home-screen widget. Production upload credentials, the Play Console review, and physical-device sign-off remain incomplete; the hosted policy now returns HTTP 200. See [release preparation](RELEASE_PREPARATION.md).
+**Implementation progress (22 October 2026, commit `48e4ea5`):** The release-signing debug fallback was removed, a signing prerequisite added to release packaging, CI configured to build with a short-lived test-only certificate, and the public-only Pages workflow added. The inactive local AI/model, Focus Mode, Smart Presets, voice reader, unwanted-cleanup prompt, and anti-revoke toggle were removed; the policy is embedded in-app; encrypted archive restore and device-credential app lock were added. Commit `48e4ea5` adds on-device keyword automation rules (pin, high priority, auto-archive), multi-select bulk triage, archive support for automation rules, and an aggregate-count home-screen widget. Android CI run `39756707962` (unit tests, lint, debug/release builds, and instrumented tests) and Pages run `39756707884` passed. Production upload credentials, the Play Console review, and physical-device sign-off remain incomplete; the hosted policy returns HTTP 200. See [release preparation](RELEASE_PREPARATION.md).
 
 ### Evidence and confidence
 
@@ -23,7 +23,7 @@
 | Kotlin/Compose project | Material 3, minSdk 24, targetSdk 37, local SQLite and WorkManager | Source inspected |
 | Features | Notification listener, history, priority scoring, search, Later, reminders, digests, VIP/quiet rules, exclusion/masking, keyword automation rules, bulk triage, aggregate-count widget, optional expense parsing, encrypted export/restore, optional app lock | Source present; device behavior not comprehensively validated |
 | Checks | testDebugUnitTest, lintDebug, assembleDebug completed successfully; 82 tests, 0 failures, 0 skipped across 13 suites | Local run on 22 October 2026 |
-| AAB | The checked-in release AAB predates the explicit signing prerequisite and must be rebuilt with an upload key | Local artifact inspected; not Play-ready |
+| AAB | No release AAB is tracked in the repository; a local bundle must be rebuilt with the production upload key before Play submission | Not Play-ready |
 | Release signing | Release packaging now fails without an explicit non-debug upload keystore | Source verified locally; production key still required |
 | Privacy URL | https://prem736raj.github.io/NotiFlow/ and /privacy-policy/ return HTTP 200 | HTTP checks on 22 October 2026 after successful Pages deployment |
 | GitHub Pages | Enabled through the public-only Actions workflow | Verified 22 October 2026; recheck after policy or repository changes |

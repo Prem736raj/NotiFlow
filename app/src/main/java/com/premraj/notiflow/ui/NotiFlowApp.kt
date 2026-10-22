@@ -40,15 +40,25 @@ fun NotiFlowApp(
     var section by rememberSaveable { mutableStateOf(HomeSection.NOW.name) }
     var detailId by rememberSaveable { mutableStateOf<Long?>(null) }
     var privacyOpen by rememberSaveable { mutableStateOf(false) }
+    var savedMediaOpen by rememberSaveable { mutableStateOf(false) }
 
     val listenerEnabled = rememberNotificationListenerState(context)
     @Suppress("UNUSED_VARIABLE") val recomposePrefs = prefVersion
     val onboardingComplete = viewModel.preferences.onboardingComplete
 
     BackHandler(enabled = privacyOpen) { privacyOpen = false }
+    BackHandler(enabled = savedMediaOpen) { savedMediaOpen = false }
 
     if (privacyOpen) {
         PrivacyScreen(onBack = { privacyOpen = false })
+        return
+    }
+
+    if (savedMediaOpen) {
+        SavedMediaScreen(
+            viewModel = viewModel,
+            onBack = { savedMediaOpen = false }
+        )
         return
     }
 
@@ -131,6 +141,7 @@ fun NotiFlowApp(
             viewModel = viewModel,
             listenerEnabled = listenerEnabled,
             onOpenPrivacy = { privacyOpen = true },
+            onOpenSavedMedia = { savedMediaOpen = true },
             onBack = { screen = AppScreen.HOME.name }
         )
         AppScreen.DETAIL -> {

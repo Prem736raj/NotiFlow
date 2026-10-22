@@ -36,6 +36,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.VolumeOff
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PrivacyTip
@@ -71,6 +72,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -86,6 +88,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.premraj.notiflow.data.AppThemeMode
 import com.premraj.notiflow.data.AutomationAction
+import com.premraj.notiflow.data.MediaSaver
 import com.premraj.notiflow.data.NotificationCategory
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -96,6 +99,7 @@ fun SettingsScreen(
     viewModel: NotiFlowViewModel,
     listenerEnabled: Boolean,
     onOpenPrivacy: () -> Unit,
+    onOpenSavedMedia: () -> Unit,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -126,8 +130,33 @@ fun SettingsScreen(
     var rulePackage by remember { mutableStateOf<String?>(null) }
     var ruleAction by remember { mutableStateOf(AutomationAction.HIGH_PRIORITY) }
     var ruleAppMenu by remember { mutableStateOf(false) }
+    var mediaPermissionDenied by remember { mutableStateOf(false) }
+    var mediaActionConfirmClear by remember { mutableStateOf(false) }
+    var mediaActionScanBusy by remember { mutableStateOf(false) }
+    var mediaStatusMessage by remember { mutableStateOf<String?>(null) }
 
     val appNames = remember(observedApps) { observedApps.toMap() }
+
+    val mediaPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { grants ->
+        // Partial photo access ("select photos") denies the full permissions but grants
+        // READ_MEDIA_VISUAL_USER_SELECTED, so only the shared access check decides.
+        if (MediaSaver.hasMediaReadAccess(context)) {
+            mediaPermissionDenied = false
+            viewModel.setSaveMediaEnabled(true)
+        } else {
+            viewModel.setSaveMediaEnabled(false)
+            mediaPermissionDenied = true
+        }
+    }
+
+    LaunchedEffect(mediaActionScanBusy) {
+        if (mediaActionScanBusy) {
+            viewModel.runMediaScanNow()
+            mediaActionScanBusy = false
+        }
+    }
 
     val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -300,6 +329,29 @@ fun SettingsScreen(
                         restoreError = null
                     }
                 ) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (mediaActionConfirmClear) {
+        AlertDialog(
+            onDismissRequest = { mediaActionConfirmClear = false },
+            title = { Text("Delete all saved media?") },
+            text = {
+                Text("This permanently removes every private photo/video copy inside NotiFlow. The originals in WhatsApp's folders are untouched.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.clearSavedMedia()
+                        mediaActionConfirmClear = false
+                        mediaStatusMessage = "Saved media deleted."
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { mediaActionConfirmClear = false }) { Text("Cancel") }
             }
         )
     }
@@ -713,6 +765,117 @@ fun SettingsScreen(
                     ) { Text("Add automation rule") }
                     Text(
                         "Auto-archive keeps the alert in History and never dismisses the source app's notification.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
+                }
+            }
+
+            item {
+                SettingsCard(Icons.Outlined.Image, "Save WhatsApp media") {
+                    val mediaStats = viewModel.savedMediaStats.collectAsStateWithLifecycle().value
+                    val vmMediaMessage = viewModel.mediaScanMessage.collectAsStateWithLifecycle().value
+                    val permissionReady = MediaSaver.hasMediaReadAccess(context)
+                    val statusText = mediaStatusMessage ?: vmMediaMessage ?: run {
+                        when {
+                            prefs.saveMediaEnabled && !permissionReady -> "Media saving is on but access is revoked."
+                            mediaPermissionDenied -> "Photo/video access was denied. Grant it in Android settings."
+                            else -> null
+                        }
+                    }
+                    Text(
+                        "Keep a private, on-device copy of photos and videos you receive on WhatsApp. Copies stay inside NotiFlow's private storage and remove only when you delete them here. WhatsApp view-once media cannot be saved.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Save incoming media", fontWeight = FontWeight.Medium)
+                            Text(
+                                if (permissionReady) "Photos and videos are copied into NotiFlow's private storage when they land in shared storage."
+                                else "NotiFlow needs photo and video access before it can save media.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = prefs.saveMediaEnabled,
+                            onCheckedChange = { requested ->
+                                if (requested) {
+                                    if (permissionReady) {
+                                        mediaPermissionDenied = false
+                                        viewModel.setSaveMediaEnabled(true)
+                                    } else {
+                                        mediaPermissionLauncher.launch(MediaSaver.requestedPermissions())
+                                    }
+                                } else {
+                                    viewModel.setSaveMediaEnabled(false)
+                                    mediaPermissionDenied = false
+                                }
+                            },
+                            enabled = true
+                        )
+                    }
+                    if (statusText != null) {
+                        Text(
+                            statusText,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (statusText.startsWith("Media saving is on") || statusText.startsWith("Photo/video")) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            },
+                            modifier = Modifier.padding(bottom = 6.dp)
+                        )
+                    }
+                    if (mediaPermissionDenied) {
+                        OutlinedButton(
+                            onClick = {
+                                runCatching {
+                                    context.startActivity(
+                                        Intent(
+                                            android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                            android.net.Uri.parse("package:${context.packageName}")
+                                        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    )
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+                        ) { Text("Open Android app settings") }
+                    }
+                    SettingStatus(
+                        "Saved media",
+                        if (mediaStats.first == 0) "0 files" else "${mediaStats.first} files · ${formatBytes(mediaStats.second)}",
+                        mediaStats.first > 0
+                    )
+                    if (prefs.saveMediaEnabled) {
+                        OutlinedButton(
+                            onClick = { mediaActionScanBusy = true },
+                            enabled = permissionReady && !mediaActionScanBusy,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp)
+                        ) { Text(if (mediaActionScanBusy) "Scanning…" else "Scan now") }
+                    }
+                    OutlinedButton(
+                        onClick = onOpenSavedMedia,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp)
+                    ) { Text("View saved media") }
+                    OutlinedButton(
+                        onClick = { mediaActionConfirmClear = true },
+                        enabled = mediaStats.first > 0,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp)
+                    ) { Text("Clear all saved media") }
+                    Text(
+                        "Saved media never goes into encrypted exports and can't reach view-once content.",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.outline,
                         modifier = Modifier.padding(top = 6.dp)

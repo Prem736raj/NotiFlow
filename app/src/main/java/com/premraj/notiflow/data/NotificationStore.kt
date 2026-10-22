@@ -26,6 +26,9 @@ class NotificationStore(context: Context) {
     private val _expenses = MutableStateFlow<List<ExpenseTransaction>>(emptyList())
     val expenses: StateFlow<List<ExpenseTransaction>> = _expenses.asStateFlow()
 
+    private val _savedMedia = MutableStateFlow<List<SavedMedia>>(emptyList())
+    val savedMedia: StateFlow<List<SavedMedia>> = _savedMedia.asStateFlow()
+
     private val _initialLoadComplete = MutableStateFlow(false)
     val initialLoadComplete: StateFlow<Boolean> = _initialLoadComplete.asStateFlow()
 
@@ -34,7 +37,10 @@ class NotificationStore(context: Context) {
     init {
         scope.launch {
             try {
-                mutationMutex.withLock { refreshFromDb() }
+                mutationMutex.withLock {
+                    refreshFromDb()
+                    refreshSavedMediaFromDb()
+                }
             } finally {
                 _initialLoadComplete.value = true
             }
@@ -257,6 +263,132 @@ class NotificationStore(context: Context) {
             _expenses.value = emptyList()
         }
     }
+
+    // ----- Saved media (photos/videos copied from WhatsApp's shared storage) -----
+
+    suspend fun savedMediaCount(): Int = withContext(Dispatchers.IO) {
+        helper.readableDatabase.rawQuery("SELECT COUNT(*) FROM $TABLE_SAVED_MEDIA", null).use {
+            if (it.moveToFirst()) it.getInt(0) else 0
+        }
+    }
+
+    suspend fun hasSavedMediaForUri(originalUri: String): Boolean = withContext(Dispatchers.IO) {
+        helper.readableDatabase.rawQuery(
+            "SELECT 1 FROM $TABLE_SAVED_MEDIA WHERE original_uri=? LIMIT 1",
+            arrayOf(originalUri)
+        ).use { it.moveToFirst() }
+    }
+
+    suspend fun hasSavedMediaForHash(contentHash: String): Boolean = withContext(Dispatchers.IO) {
+        helper.readableDatabase.rawQuery(
+            "SELECT 1 FROM $TABLE_SAVED_MEDIA WHERE content_hash=? LIMIT 1",
+            arrayOf(contentHash)
+        ).use { it.moveToFirst() }
+    }
+
+    suspend fun insertSavedMedia(media: SavedMedia): Long = withContext(Dispatchers.IO) {
+        mutationMutex.withLock {
+            helper.writableDatabase.rawQuery(
+                "SELECT COUNT(*) FROM $TABLE_SAVED_MEDIA WHERE content_hash=?",
+                arrayOf(media.contentHash)
+            ).use { if (it.moveToFirst() && it.getInt(0) > 0) return@withLock -1L }
+
+            val db = helper.writableDatabase
+            db.beginTransaction()
+            val rowId = try {
+                val values = ContentValues().apply {
+                    put("package_name", media.packageName)
+                    put("display_name", media.displayName)
+                    put("kind", media.kind.name)
+                    put("mime_type", media.mimeType)
+                    put("size_bytes", media.sizeBytes)
+                    put("content_hash", media.contentHash)
+                    put("saved_path", media.savedPath)
+                    put("original_uri", media.originalUri)
+                    put("captured_at", media.capturedAt)
+                    put("saved_at", media.savedAt)
+                    if (media.notificationId != null) {
+                        put("notification_id", media.notificationId)
+                    } else {
+                        putNull("notification_id")
+                    }
+                }
+                db.insertWithOnConflict(TABLE_SAVED_MEDIA, null, values, SQLiteDatabase.CONFLICT_IGNORE)
+            } finally {
+                db.endTransaction()
+            }
+            refreshSavedMediaFromDb()
+            rowId
+        }
+    }
+
+    suspend fun savedMediaItems(): List<SavedMedia> = withContext(Dispatchers.IO) {
+        querySavedMedia()
+    }
+
+    suspend fun savedMediaStats(): Pair<Int, Long> = withContext(Dispatchers.IO) {
+        helper.readableDatabase.rawQuery(
+            "SELECT COUNT(*), COALESCE(SUM(size_bytes),0) FROM $TABLE_SAVED_MEDIA",
+            null
+        ).use {
+            if (it.moveToFirst()) it.getInt(0) to it.getLong(1) else 0 to 0L
+        }
+    }
+
+    suspend fun findNotificationIdForMedia(packageName: String, capturedAtMillis: Long): Long? =
+        withContext(Dispatchers.IO) {
+            val window = 24 * 60 * 60_000L
+            helper.readableDatabase.rawQuery(
+                """
+                SELECT id FROM $TABLE
+                WHERE package_name=?
+                  AND posted_at BETWEEN ? AND ?
+                ORDER BY ABS(posted_at - ?) ASC
+                LIMIT 1
+                """.trimIndent(),
+                arrayOf(
+                    packageName,
+                    (capturedAtMillis - window).toString(),
+                    (capturedAtMillis + window).toString(),
+                    capturedAtMillis.toString()
+                )
+            ).use { cursor ->
+                if (cursor.moveToFirst()) cursor.getLong(0) else null
+            }
+        }
+
+    suspend fun deleteSavedMedia(id: Long) = withContext(Dispatchers.IO) {
+        mutationMutex.withLock {
+            helper.writableDatabase.delete(TABLE_SAVED_MEDIA, "id=?", arrayOf(id.toString()))
+            refreshSavedMediaFromDb()
+        }
+    }
+
+    suspend fun clearedSavedMediaRows(): List<SavedMedia> = withContext(Dispatchers.IO) {
+        mutationMutex.withLock {
+            val rows = querySavedMedia()
+            helper.writableDatabase.delete(TABLE_SAVED_MEDIA, null, null)
+            refreshSavedMediaFromDb()
+            rows
+        }
+    }
+
+    private fun refreshSavedMediaFromDb() {
+        _savedMedia.value = querySavedMedia()
+    }
+
+    private fun querySavedMedia(): List<SavedMedia> =
+        helper.readableDatabase.query(
+            TABLE_SAVED_MEDIA,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "captured_at DESC"
+        ).use { cursor ->
+            buildList { while (cursor.moveToNext()) add(cursor.toSavedMedia()) }
+        }
 
     suspend fun get(id: Long): NotificationItem? = withContext(Dispatchers.IO) {
         getInternal(helper.readableDatabase, id)
@@ -622,6 +754,28 @@ class NotificationStore(context: Context) {
         if (value == null) putNull(key) else put(key, value)
     }
 
+    private fun Cursor.toSavedMedia(): SavedMedia {
+        val id = getLong(col("id"))
+        val kind = enumOrDefault(getNullableString("kind"), SavedMediaKind.IMAGE)
+        return SavedMedia(
+            id = id,
+            packageName = getNullableString("package_name").orEmpty(),
+            displayName = getNullableString("display_name").orEmpty(),
+            kind = kind,
+            mimeType = getNullableString("mime_type"),
+            sizeBytes = getLongOrNull("size_bytes") ?: 0L,
+            contentHash = getNullableString("content_hash").orEmpty(),
+            savedPath = getNullableString("saved_path").orEmpty(),
+            originalUri = getNullableString("original_uri").orEmpty(),
+            capturedAt = getLongOrNull("captured_at") ?: 0L,
+            savedAt = getLongOrNull("saved_at") ?: 0L,
+            notificationId = getNullableLong("notification_id")
+        )
+    }
+
+    private fun Cursor.getLongOrNull(name: String): Long? =
+        getColumnIndex(name).takeIf { it >= 0 && !isNull(it) }?.let { getLong(it) }
+
     private class Db(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_VERSION) {
         override fun onCreate(db: SQLiteDatabase) {
             db.execSQL(
@@ -660,6 +814,7 @@ class NotificationStore(context: Context) {
             db.execSQL("CREATE INDEX idx_notifications_source_removed ON $TABLE(is_removed_by_source)")
 
             createExpenseTable(db)
+            createSavedMediaTable(db)
         }
 
         override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -675,6 +830,9 @@ class NotificationStore(context: Context) {
                 db.execSQL("UPDATE $TABLE SET is_removed_by_source = is_deleted_by_sender WHERE is_deleted_by_sender = 1")
                 db.execSQL("CREATE INDEX IF NOT EXISTS idx_notifications_source_removed ON $TABLE(is_removed_by_source)")
                 db.execSQL("DROP INDEX IF EXISTS idx_notifications_deleted")
+            }
+            if (oldVersion < 5) {
+                createSavedMediaTable(db)
             }
         }
 
@@ -700,14 +858,39 @@ class NotificationStore(context: Context) {
             db.execSQL("CREATE INDEX IF NOT EXISTS idx_expenses_notif_id ON $TABLE_EXPENSES(notification_id)")
         }
 
+        private fun createSavedMediaTable(db: SQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS $TABLE_SAVED_MEDIA (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    package_name TEXT NOT NULL,
+                    display_name TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    mime_type TEXT,
+                    size_bytes INTEGER NOT NULL DEFAULT 0,
+                    content_hash TEXT NOT NULL UNIQUE,
+                    saved_path TEXT NOT NULL,
+                    original_uri TEXT NOT NULL UNIQUE,
+                    captured_at INTEGER NOT NULL,
+                    saved_at INTEGER NOT NULL,
+                    notification_id INTEGER
+                )
+                """.trimIndent()
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_saved_media_captured ON $TABLE_SAVED_MEDIA(captured_at DESC)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_saved_media_package ON $TABLE_SAVED_MEDIA(package_name)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_saved_media_notification ON $TABLE_SAVED_MEDIA(notification_id)")
+        }
+
 
     }
 
     private companion object {
         const val DB_NAME = "notiflow.db"
-        const val DB_VERSION = 4
+        const val DB_VERSION = 5
         const val TABLE = "notifications"
         const val TABLE_EXPENSES = "expense_transactions"
+        const val TABLE_SAVED_MEDIA = "saved_media"
     }
 }
 

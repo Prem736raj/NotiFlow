@@ -77,6 +77,23 @@ class WorkScheduler(
         )
     }
 
+    fun ensureMediaScanScheduled() {
+        if (!preferences.saveMediaEnabled) {
+            workManager.cancelUniqueWork(MEDIA_SCAN_WORK)
+            return
+        }
+        val request = PeriodicWorkRequestBuilder<MediaScanWorker>(1, TimeUnit.HOURS).build()
+        workManager.enqueueUniquePeriodicWork(
+            MEDIA_SCAN_WORK,
+            ExistingPeriodicWorkPolicy.KEEP,
+            request
+        )
+    }
+
+    fun cancelMediaScan() {
+        workManager.cancelUniqueWork(MEDIA_SCAN_WORK)
+    }
+
     private fun digestRequest() = OneTimeWorkRequestBuilder<DigestWorker>()
         .setInitialDelay(
             millisUntilNext(preferences.digestHour, preferences.digestMinute),
@@ -100,6 +117,7 @@ class WorkScheduler(
         const val DIGEST_WORK = "notiflow-digest"
         const val CLEANUP_WORK = "notiflow-cleanup"
         const val REMINDER_TAG = "notiflow-reminders"
+        const val MEDIA_SCAN_WORK = "notiflow-media-scan"
     }
 }
 

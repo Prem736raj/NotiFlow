@@ -22,6 +22,7 @@ import com.premraj.notiflow.data.NotificationInsights
 import com.premraj.notiflow.data.NotificationItem
 import com.premraj.notiflow.data.NotificationPriority
 import com.premraj.notiflow.data.NotificationState
+import com.premraj.notiflow.data.SavedMedia
 import com.premraj.notiflow.data.TransactionType
 import com.premraj.notiflow.intelligence.InsightsAnalyzer
 import com.premraj.notiflow.intelligence.LocalIntelligence
@@ -40,12 +41,11 @@ data class RestoreSummary(
     val notificationsImported: Int,
     val vipRulesImported: Int,
     val automationRulesImported: Int = 0
-)
-
-class NotiFlowViewModel(application: Application) : AndroidViewModel(application) {
+)class NotiFlowViewModel(application: Application) : AndroidViewModel(application) {
     private val graph = application.appGraph
     val notifications: StateFlow<List<NotificationItem>> = graph.store.items
     val expenseTransactions: StateFlow<List<ExpenseTransaction>> = graph.store.expenses
+    val savedMedia: StateFlow<List<SavedMedia>> = graph.store.savedMedia
     val initialLoadComplete: StateFlow<Boolean> = graph.store.initialLoadComplete
 
     private val _preferencesVersion = MutableStateFlow(0)
@@ -67,6 +67,12 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
 
     private val _storageStats = MutableStateFlow(0 to 0L)
     val storageStats: StateFlow<Pair<Int, Long>> = _storageStats.asStateFlow()
+
+    private val _savedMediaStats = MutableStateFlow(0 to 0L)
+    val savedMediaStats: StateFlow<Pair<Int, Long>> = _savedMediaStats.asStateFlow()
+
+    private val _mediaScanMessage = MutableStateFlow<String?>(null)
+    val mediaScanMessage: StateFlow<String?> = _mediaScanMessage.asStateFlow()
 
     val preferences get() = graph.preferences
 
@@ -404,6 +410,60 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
 
     fun refreshStorageStats() = viewModelScope.launch {
         _storageStats.value = graph.store.storageStats()
+        _savedMediaStats.value = graph.store.savedMediaStats()
+    }
+
+    fun setSaveMediaEnabled(enabled: Boolean) {
+        graph.preferences.saveMediaEnabled = enabled
+        if (enabled) {
+            graph.workScheduler.ensureMediaScanScheduled()
+            viewModelScope.launch {
+                val result = runCatching {
+                    com.premraj.notiflow.data.MediaSaver.scan(getApplication(), graph.store, graph.preferences)
+                }.getOrNull()
+                _mediaScanMessage.value = result?.summary
+                refreshStorageStats()
+            }
+        } else {
+            graph.workScheduler.cancelMediaScan()
+        }
+        bumpPrefs()
+    }
+
+    fun runMediaScanNow() = viewModelScope.launch {
+        val result = runCatching {
+            com.premraj.notiflow.data.MediaSaver.scan(getApplication(), graph.store, graph.preferences)
+        }.getOrNull()
+        if (result?.missingPermission == true && !graph.preferences.saveMediaEnabled) {
+            _mediaScanMessage.value = "Enable media saving and grant photo permission first."
+        } else {
+            _mediaScanMessage.value = result?.summary
+        }
+        refreshStorageStats()
+    }
+
+    fun deleteSavedMedia(id: Long, path: String) = viewModelScope.launch {
+        graph.store.deleteSavedMedia(id)
+        runCatching {
+            com.premraj.notiflow.data.MediaSaver.deletePhysicalFile(path)
+        }
+        refreshStorageStats()
+    }
+
+    fun clearSavedMedia() = viewModelScope.launch {
+        val removed = graph.store.clearedSavedMediaRows()
+        var deleted = 0
+        runCatching {
+            removed.forEach { row ->
+                if (com.premraj.notiflow.data.MediaSaver.deletePhysicalFile(row.savedPath)) deleted += 1
+            }
+        }
+        _mediaScanMessage.value = "Removed ${removed.size} saved media (deleted $deleted files)."
+        refreshStorageStats()
+    }
+
+    fun consumeMediaScanMessage() {
+        _mediaScanMessage.value = null
     }
 
     private fun bumpPrefs() {

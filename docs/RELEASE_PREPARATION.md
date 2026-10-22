@@ -45,7 +45,7 @@ The privacy source is docs/privacy-policy/index.html. The Pages workflow at .git
 ## Remaining Play/device checks
 
 - [ ] Verify consent, sensitive-data disclosure, and decline/revocation on physical devices.
-- [ ] Review final merged manifest, SDKs, Data Safety declarations and current Play submission rules.
+- [ ] Review final merged manifest, SDKs, Data Safety declarations and current Play submission rules; declare the optional scoped media permissions (READ_MEDIA_IMAGES/READ_MEDIA_VIDEO/READ_MEDIA_VISUAL_USER_SELECTED) as user-controlled, off-by-default, and on-device-only in the Data Safety form, and keep the view-once limitation consistent across app UI and policy.
 - [ ] Test capture, listener recovery, OTP/payment protection, reminders, app lock, and lock-screen privacy on Pixel/AOSP, Samsung and Xiaomi/HyperOS.
 - [ ] Verify upload-key identity and final AAB acceptance on the Play testing track; fulfill account-specific testing requirements.
 - [ ] Record performance, scheduling tolerance, battery and crash/ANR baselines before broad release.

@@ -62,6 +62,18 @@ class UserPreferences internal constructor(private val prefs: SharedPreferences)
             .putBoolean(KEY_EXPENSE_TRACKER_CONSENT, value)
             .apply()
 
+    var saveMediaEnabled: Boolean
+        get() = prefs.getBoolean(KEY_SAVE_MEDIA_ENABLED, false) &&
+            prefs.getBoolean(KEY_SAVE_MEDIA_CONSENT, false)
+        set(value) = prefs.edit()
+            .putBoolean(KEY_SAVE_MEDIA_ENABLED, value)
+            .putBoolean(KEY_SAVE_MEDIA_CONSENT, value)
+            .apply()
+
+    var lastMediaScanWatermark: Long
+        get() = prefs.getLong(KEY_LAST_MEDIA_SCAN_WATERMARK, 0L)
+        set(value) = prefs.edit().putLong(KEY_LAST_MEDIA_SCAN_WATERMARK, value).apply()
+
     var appThemeMode: AppThemeMode
         get() {
             val name = prefs.getString(KEY_APP_THEME_MODE, AppThemeMode.SYSTEM.name)
@@ -275,6 +287,9 @@ class UserPreferences internal constructor(private val prefs: SharedPreferences)
         const val KEY_AUTO_COPY_OTP_CONSENT = "auto_copy_otp_explicit_consent"
         const val KEY_EXPENSE_TRACKER_ENABLED = "expense_tracker_enabled"
         const val KEY_EXPENSE_TRACKER_CONSENT = "expense_tracker_explicit_consent"
+        const val KEY_SAVE_MEDIA_ENABLED = "save_media_enabled"
+        const val KEY_SAVE_MEDIA_CONSENT = "save_media_explicit_consent"
+        const val KEY_LAST_MEDIA_SCAN_WATERMARK = "last_media_scan_watermark"
         const val KEY_QUIET_PACKAGES = "quiet_packages"
         const val KEY_QUIET_CATEGORIES = "quiet_categories"
         const val KEY_VIP_RULES = "vip_rules"

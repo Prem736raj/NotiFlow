@@ -14,6 +14,7 @@ NotiFlow is an Android notification inbox focused on local-first notification hi
 - Pin, state, reminder, VIP, learned preference, search, digest, cleanup, and expense-domain code exists.
 - Keyword automation rules can auto-pin, raise priority, or archive matching alerts on-device.
 - Multi-select bulk triage in the inbox supports Done, one-hour snooze, Archive, and Delete.
+- Optional off-by-default "Save WhatsApp media" copies newly received photos/videos from WhatsApp's shared folders into an app-private folder with SHA-256 dedupe, a saved-media viewer, and per-item or bulk delete; view-once media cannot be saved and saved copies are excluded from encrypted exports.
 - An optional home-screen widget shows aggregate alert counts only; it never exposes titles, bodies, senders, OTPs, or expense data.
 - The privacy policy is embedded in the app and works offline; no external URL is required.
 - Group-summary and ongoing/foreground-service notifications are filtered before persistence.
@@ -37,6 +38,7 @@ Sensitive controls are opt-in where they create additional derived/exposed data:
 
 - OTP auto-copy: off until explicit user consent.
 - Expense parsing: off until explicit user consent.
+- WhatsApp media saving: off until explicit consent plus a scoped media permission (READ_MEDIA_IMAGES/READ_MEDIA_VIDEO or Android's partial "select photos" access).
 - Automatic cleanup and scheduled digest: off by default.
 - Sensitive previews: hidden by default.
 

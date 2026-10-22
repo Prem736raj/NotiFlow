@@ -135,3 +135,31 @@ data class DigestSnapshot(
     val items: List<NotificationItem>
 )
 
+enum class SavedMediaKind(val label: String) {
+    IMAGE("Photo"),
+    VIDEO("Video")
+}
+
+data class SavedMedia(
+    val id: Long,
+    val packageName: String,
+    val displayName: String,
+    val kind: SavedMediaKind,
+    val mimeType: String?,
+    val sizeBytes: Long,
+    val contentHash: String,
+    val savedPath: String,
+    val originalUri: String,
+    val capturedAt: Long,
+    val savedAt: Long,
+    val notificationId: Long? = null
+) {
+    val formattedSize: String
+        get() = when {
+            sizeBytes >= 1_073_741_824L -> String.format("%.1f GB", sizeBytes / 1_073_741_824.0)
+            sizeBytes >= 1_048_576L -> String.format("%.1f MB", sizeBytes / 1_048_576.0)
+            sizeBytes >= 1_024L -> String.format("%.0f KB", sizeBytes / 1_024.0)
+            else -> "$sizeBytes B"
+        }
+}
+

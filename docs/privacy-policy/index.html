@@ -110,7 +110,8 @@
         <li>Notification titles, message text, and timestamp details;</li>
         <li>Sender and conversation participant information exposed by Android;</li>
         <li>Verification codes (OTPs) contained in incoming alerts;</li>
-        <li>Transaction/banking details (amount, merchant or party, account references, balance hints) contained in incoming financial SMS/push alerts.</li>
+        <li>Transaction/banking details (amount, merchant or party, account references, balance hints) contained in incoming financial SMS/push alerts;</li>
+        <li>Optionally (only if you grant it), shared photo/video content: when you enable media saving, NotiFlow requests Android's scoped <code>READ_MEDIA_IMAGES</code>/<code>READ_MEDIA_VIDEO</code> permissions (or Android's "select photos" partial access) so it can copy newly received WhatsApp photos and videos. Granting media access is never required to use NotiFlow.</li>
     </ul>
     <p>We treat all captured notification content as strictly confidential and sensitive. It is never treated as anonymous or non-sensitive telemetry.</p>
 
@@ -124,6 +125,7 @@
         <li><strong>Search & Reminders:</strong> Allowing you to query your past notifications and set reminders with approximate background delivery via Android WorkManager.</li>
         <li><strong>Optional OTP Clipboard Copying:</strong> When explicitly enabled by you in Settings, detecting OTP codes and copying them to your device clipboard with sensitive flag hints.</li>
         <li><strong>Optional Expense Tracking:</strong> When explicitly enabled by you in Settings, extracting transactional expense records for your personal financial dashboard.</li>
+        <li><strong>Optional WhatsApp Media Saving:</strong> Off by default and enabled only by an explicit switch in Settings. When enabled, NotiFlow monitors WhatsApp's shared photo/video folders and copies each newly received image or video into the app's own private storage. WhatsApp <em>view-once</em> media cannot be observed by any Android app and is never saved.</li>
     </ul>
 
     <h2>3. On-Device Storage & Security</h2>
@@ -134,6 +136,7 @@
         <li><strong>Password-Protected Archives:</strong> When you choose to export your history, the archive is encrypted on-device using authenticated AES-GCM with a PBKDF2-derived key based on your personal passphrase. Archives include notification records, VIP rules, and automation rules and are shared securely via Android's FileProvider.</li>
         <li><strong>Optional App Lock:</strong> You can require your device's existing screen lock before opening NotiFlow. The app does not store a separate PIN or password.</li>
         <li><strong>Widget Updates:</strong> If you add the home-screen widget, Android's launcher sends standard widget update requests and the widget receives aggregate counts only. No notification content is exposed to the launcher.</li>
+        <li><strong>Saved Media Isolation:</strong> Saved photos/videos live in an app-private folder, are excluded from encrypted export archives, are never transmitted anywhere, and remain visible only inside NotiFlow's saved-media viewer.</li>
     </ul>
 
     <h2>4. No Cloud AI & No Automatic Model Downloads</h2>
@@ -145,6 +148,7 @@
         <li><strong>Application Exclusion:</strong> You can exclude specific applications from ever being captured by NotiFlow.</li>
         <li><strong>Configurable Retention:</strong> You can configure automatic cleanup (7, 30, 90, or 180 days) for stale notifications. Pinned items and reminders are protected from automatic deletion. Financial transaction records remain decoupled from notification cleanup unless you explicitly delete them.</li>
         <li><strong>Delete All History:</strong> You can wipe all notification records and derived expense transactions at any time with a single tap in Settings.</li>
+        <li><strong>Delete Saved Media:</strong> You can remove saved photos/videos individually from the saved-media viewer or delete every copy at once from Settings. Deleting copies never touches the originals in WhatsApp's folders.</li>
         <li><strong>Revoking Access:</strong> You can disable Notification Access at any time in Android system settings.</li>
     </ul>
 

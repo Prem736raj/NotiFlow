@@ -3,4 +3,5 @@
     <cache-path name="backup_cache" path="backups/" />
     <cache-path name="diagnostics_cache" path="diagnostics/" />
     <files-path name="backup_files" path="backups/" />
+    <files-path name="saved_media" path="saved_media/" />
 </paths>

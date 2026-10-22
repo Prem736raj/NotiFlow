@@ -43,6 +43,29 @@ import kotlinx.coroutines.flow.asStateFlow
 
 class NotiFlowNotificationListener : NotificationListenerService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var mediaObserver: android.database.ContentObserver? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        runCatching { registerMediaWatcher() }
+    }
+
+    private fun registerMediaWatcher() {
+        val applicationContext = this
+        val saver = com.premraj.notiflow.data.MediaSaver
+        val observer = saver.createObserver(applicationContext)
+        runCatching {
+            saver.observedUris.forEach { uri ->
+                contentResolver.registerContentObserver(uri, true, observer)
+            }
+            mediaObserver = observer
+        }.onFailure {
+            runCatching {
+                contentResolver.unregisterContentObserver(observer)
+            }
+            mediaObserver = null
+        }
+    }
 
     override fun onListenerConnected() {
         super.onListenerConnected()
@@ -77,6 +100,10 @@ class NotiFlowNotificationListener : NotificationListenerService() {
     override fun onDestroy() {
         _isServiceConnected.value = false
         if (instance === this) instance = null
+        runCatching {
+            mediaObserver?.let { contentResolver.unregisterContentObserver(it) }
+        }
+        mediaObserver = null
         scope.cancel()
         super.onDestroy()
     }

@@ -24,6 +24,14 @@ class NotiFlowApplication : Application() {
         NotificationChannels.create(this)
         graph.workScheduler.ensureCleanupScheduled()
         if (graph.preferences.digestEnabled) graph.workScheduler.scheduleDigest(updateExisting = false)
+        graph.workScheduler.ensureMediaScanScheduled()
+        if (graph.preferences.saveMediaEnabled) {
+            appScope.launch {
+                runCatching {
+                    com.premraj.notiflow.data.MediaSaver.scan(this@NotiFlowApplication, graph.store, graph.preferences)
+                }
+            }
+        }
         appScope.launch {
             graph.store.initialLoadComplete.first { it }
             graph.store.items.collect { items ->

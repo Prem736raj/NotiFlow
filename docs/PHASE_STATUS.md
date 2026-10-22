@@ -23,6 +23,7 @@ This file is a status index, not proof. Runtime/build proof must come from CI, t
 | 17 | Source-verified | keyword automation rules for pin, high priority, and auto-archive are applied during capture; storage/matching tests pass |
 | 18 | Source-verified | multi-select Done, one-hour snooze, Archive, and Delete are wired through bulk store operations |
 | 19 | Insufficiently tested | aggregate-count home-screen widget compiles and updates from store changes; launcher behavior needs device verification |
+| 20 | Source-verified | optional off-by-default WhatsApp media saving: scoped permissions, MediaStore observer + hourly work, app-private copies with SHA-256 dedupe, saved-media viewer, per-item and bulk delete; view-once media is impossible to save and excluded from export archives; runtime behavior needs device verification |
 
 ## Status legend
 

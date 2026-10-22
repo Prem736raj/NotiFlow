@@ -77,13 +77,17 @@ fun PrivacyScreen(onBack: () -> Unit) {
                     Text(
                         "After you grant Android Notification Access, NotiFlow can read notifications from apps you enable. Depending on those apps, this may include the app name, notification title and text, sender information, timestamps, verification codes, and transaction details."
                     )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Separately and only if you grant it, NotiFlow can optionally request Android's scoped photo and video permission when you turn on \"Save WhatsApp media\". That permission lets NotiFlow see newly received WhatsApp photos and videos in shared storage so it can privately copy them. Media access is optional and not required for any other feature."
+                    )
                 }
             }
 
             item {
                 PolicySection("2. How data is used") {
                     Text(
-                        "Captured content is used only to provide the features you choose: local history, rules-based categories and priority, keyword automation rules, search, reminders, optional OTP clipboard copying, optional expense tracking, and optional encrypted export. Automation rules run on-device and only act on notifications you configure. Notification content is never used for advertising or sold to third parties."
+                        "Captured content is used only to provide the features you choose: local history, rules-based categories and priority, keyword automation rules, search, reminders, optional OTP clipboard copying, optional expense tracking, optional encrypted export, and optional media saving. Media saving, when you enable it, copies WhatsApp photos and videos you receive into NotiFlow's private storage so they outlive WhatsApp's cleanup; WhatsApp view-once media cannot be saved. Automation rules run on-device and only act on notifications you configure. Notification content is never used for advertising or sold to third parties."
                     )
                 }
             }
@@ -93,13 +97,17 @@ fun PrivacyScreen(onBack: () -> Unit) {
                     Text(
                         "Notification records, automation rules, and derived expense rows are stored in NotiFlow's private SQLite database and preferences. Android cloud backup is disabled. Encrypted exports include notification records, VIP rules, and automation rules; they use AES-GCM with a key derived from your passphrase and are shared only through Android's file provider when you choose to export. Optional app lock uses your device's existing screen lock; NotiFlow does not store a separate password. The optional home-screen widget displays alert counts only and never notification titles or message content."
                     )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Saved media, when the optional media-saving feature is enabled, is stored in an app-private folder that no other app can read. Saved copies are never included in encrypted exports and are never transmitted from the device. Deleting a notification or clearing history does not delete saved media copies; they are removed only when you delete them individually, clear them from the saved-media viewer, or uninstall NotiFlow."
+                    )
                 }
             }
 
             item {
                 PolicySection("4. Retention and your controls") {
                     Text(
-                        "You can exclude apps, configure retention, hide sensitive previews, delete individual items, or delete all history and derived expenses at any time. Pinned items and active reminders are protected from automatic cleanup. You can revoke Notification Access in Android settings at any time."
+                        "You can exclude apps, configure retention, hide sensitive previews, delete individual items, or delete all history and derived expenses at any time. Pinned items and active reminders are protected from automatic cleanup. Saved media copies stay until you delete them. You can revoke Notification Access and photo/video access in Android settings at any time."
                     )
                 }
             }

@@ -47,6 +47,7 @@ import android.app.TimePickerDialog
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -125,6 +126,8 @@ fun NotificationCard(
     onQuickRemind: ((Long) -> Unit)? = null,
     onQuickDone: (() -> Unit)? = null,
     onQuickTogglePin: (() -> Unit)? = null,
+    selectionMode: Boolean = false,
+    selected: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -143,7 +146,9 @@ fun NotificationCard(
         } else null
     }
 
-    val cardBorder = if (isHighPriority) {
+    val cardBorder = if (selected) {
+        BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+    } else if (isHighPriority) {
         BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
     } else null
 
@@ -173,6 +178,16 @@ fun NotificationCard(
                         .width(3.dp)
                         .fillMaxHeight()
                         .background(MaterialTheme.colorScheme.primary)
+                )
+            }
+
+            if (selectionMode) {
+                Checkbox(
+                    checked = selected,
+                    onCheckedChange = { onClick() },
+                    modifier = Modifier
+                        .align(Alignment.CenterVertically)
+                        .padding(start = 12.dp)
                 )
             }
 
@@ -421,7 +436,7 @@ fun NotificationCard(
                         }
                     }
 
-                    if (onQuickRemind != null || onQuickDone != null || onQuickTogglePin != null) {
+                    if (!selectionMode && (onQuickRemind != null || onQuickDone != null || onQuickTogglePin != null)) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(2.dp)

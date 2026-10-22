@@ -98,11 +98,20 @@ class BackupExporterTest {
             amountHint = null
         )
         val vipRules = setOf("com.important.app|", "com.chat.app|Mom")
+        val automationRules = listOf(
+            com.premraj.notiflow.data.AutomationRule(
+                id = "rule-1",
+                keyword = "invoice",
+                packageName = "com.important.app",
+                action = com.premraj.notiflow.data.AutomationAction.PIN
+            )
+        )
         val password = "StrongUserPassphrase#2026"
 
         val encryptedPayload = BackupExporter.createEncryptedBackup(
             notifications = listOf(item),
             vipRules = vipRules,
+            automationRules = automationRules,
             password = password
         )
 
@@ -132,6 +141,14 @@ class BackupExporterTest {
 
         val vips = json.getJSONArray("vip_rules")
         org.junit.Assert.assertEquals(2, vips.length())
+
+        val restoredRules = BackupExporter.automationRulesFromArchive(json)
+        org.junit.Assert.assertEquals(1, restoredRules.size)
+        org.junit.Assert.assertEquals("invoice", restoredRules.single().keyword)
+        org.junit.Assert.assertEquals(
+            com.premraj.notiflow.data.AutomationAction.PIN,
+            restoredRules.single().action
+        )
     }
 
     @Test

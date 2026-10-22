@@ -6,7 +6,7 @@ This file is a status index, not proof. Runtime/build proof must come from CI, t
 |---|---|---|
 | 1 | 🟡 Partial | onboarding/access UI exists; device permission/revoke/rebind behavior still needs device verification |
 | 2 | 🟡 Partial | listener, SQLite history, duplicate-key upsert exist; OEM/runtime verification remains |
-| 3 | ✅ Source-verified | detail/state/pin/VIP/later/delete exist; encrypted archive export and notification-history/VIP restore are wired |
+| 3 | ✅ Source-verified | detail/state/pin/VIP/later/delete exist; encrypted archive export and notification-history/VIP/automation-rule restore are wired |
 | 4 | ✅ Source-verified | keyword + structured filters implemented; scale benchmarking still pending |
 | 5 | ✅ Source-verified | rules-first classifier only; inactive local-model path was removed rather than shipped as a stub |
 | 6 | ✅ Source-verified | priority scoring and 15-min OTP decay verified by unit tests; broader real-world corpus pending |
@@ -19,7 +19,10 @@ This file is a status index, not proof. Runtime/build proof must come from CI, t
 | 13 | 🟡 Partial | rule-based natural-language interpretation exists; do not describe it as semantic vector search |
 | 14 | ⚠️ Guarded | retention/cleanup exists; destructive broad “%off%” deletion was removed |
 | 15 | 🟡 Partial | in-app offline policy, safe defaults, archive restore, and device-credential app lock exist; DB-at-rest threat model remains |
-| 16 | ✅ CI passed | GitHub Actions run 36440635850 verified testDebugUnitTest, lintDebug, assembleDebug in 5m 3s |
+| 16 | ✅ CI passed | GitHub Actions run 36440635850 verified testDebugUnitTest, lintDebug, assembleDebug in 5m 3s; current bundle re-verified locally on 22 October 2026 with 82 tests across 13 suites, lintDebug, and assembleDebug |
+| 17 | Source-verified | keyword automation rules for pin, high priority, and auto-archive are applied during capture; storage/matching tests pass |
+| 18 | Source-verified | multi-select Done, one-hour snooze, Archive, and Delete are wired through bulk store operations |
+| 19 | Insufficiently tested | aggregate-count home-screen widget compiles and updates from store changes; launcher behavior needs device verification |
 
 ## Status legend
 

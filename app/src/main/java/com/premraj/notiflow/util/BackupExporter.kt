@@ -1,6 +1,8 @@
 package com.premraj.notiflow.util
 
 import android.content.Context
+import com.premraj.notiflow.data.AutomationAction
+import com.premraj.notiflow.data.AutomationRule
 import com.premraj.notiflow.data.ExpenseTransaction
 import com.premraj.notiflow.data.NotificationCategory
 import com.premraj.notiflow.data.NotificationItem
@@ -73,11 +75,23 @@ object BackupExporter {
         notifications: List<NotificationItem>,
         preferences: UserPreferences,
         password: String
-    ): String = createEncryptedBackup(notifications, preferences.vipRules(), password)
+    ): String = createEncryptedBackup(
+        notifications = notifications,
+        vipRules = preferences.vipRules(),
+        automationRules = preferences.automationRules(),
+        password = password
+    )
 
     fun createEncryptedBackup(
         notifications: List<NotificationItem>,
         vipRules: Set<String>,
+        password: String
+    ): String = createEncryptedBackup(notifications, vipRules, emptyList(), password)
+
+    fun createEncryptedBackup(
+        notifications: List<NotificationItem>,
+        vipRules: Set<String>,
+        automationRules: List<AutomationRule>,
         password: String
     ): String {
         if (password.length < MIN_PASSWORD_LENGTH) {
@@ -124,6 +138,18 @@ object BackupExporter {
         val vipArray = JSONArray()
         vipRules.forEach { vipArray.put(it) }
         root.put("vip_rules", vipArray)
+
+        val ruleArray = JSONArray()
+        automationRules.forEach { rule ->
+            ruleArray.put(JSONObject().apply {
+                put("id", rule.id)
+                put("keyword", rule.keyword)
+                put("package", rule.packageName.orEmpty())
+                put("action", rule.action.name)
+                put("enabled", rule.enabled)
+            })
+        }
+        root.put("automation_rules", ruleArray)
 
         val jsonString = root.toString()
         return encrypt(jsonString, password)
@@ -204,6 +230,29 @@ object BackupExporter {
         return buildSet {
             for (index in 0 until array.length()) {
                 array.optString(index).takeIf { it.isNotBlank() }?.let(::add)
+            }
+        }
+    }
+
+    fun automationRulesFromArchive(root: JSONObject): List<AutomationRule> {
+        val array = root.optJSONArray("automation_rules") ?: return emptyList()
+        return buildList {
+            for (index in 0 until array.length()) {
+                val obj = array.optJSONObject(index) ?: continue
+                val keyword = obj.optString("keyword").trim().takeIf { it.isNotBlank() } ?: continue
+                val action = runCatching {
+                    AutomationAction.valueOf(obj.optString("action"))
+                }.getOrNull() ?: continue
+                add(
+                    AutomationRule(
+                        id = obj.optString("id").takeIf { it.isNotBlank() }
+                            ?: "restored-rule-$index",
+                        keyword = keyword,
+                        packageName = obj.optString("package").takeIf { it.isNotBlank() },
+                        action = action,
+                        enabled = obj.optBoolean("enabled", true)
+                    )
+                )
             }
         }
     }

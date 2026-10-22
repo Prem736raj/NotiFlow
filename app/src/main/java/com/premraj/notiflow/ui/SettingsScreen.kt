@@ -14,6 +14,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -33,6 +34,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.VolumeOff
+import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
@@ -51,6 +53,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -81,6 +85,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.premraj.notiflow.data.AppThemeMode
+import com.premraj.notiflow.data.AutomationAction
 import com.premraj.notiflow.data.NotificationCategory
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -116,6 +121,13 @@ fun SettingsScreen(
     var restoring by remember { mutableStateOf(false) }
     var restoreError by remember { mutableStateOf<String?>(null) }
     var restoreMessage by remember { mutableStateOf<String?>(null) }
+    var ruleDialog by remember { mutableStateOf(false) }
+    var ruleKeyword by remember { mutableStateOf("") }
+    var rulePackage by remember { mutableStateOf<String?>(null) }
+    var ruleAction by remember { mutableStateOf(AutomationAction.HIGH_PRIORITY) }
+    var ruleAppMenu by remember { mutableStateOf(false) }
+
+    val appNames = remember(observedApps) { observedApps.toMap() }
 
     val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -270,7 +282,7 @@ fun SettingsScreen(
                             }.onSuccess { summary ->
                                 restorePassphrase = ""
                                 restoreDialog = false
-                                restoreMessage = "Restored ${summary.notificationsImported} notifications and ${summary.vipRulesImported} VIP rules."
+                                restoreMessage = "Restored ${summary.notificationsImported} notifications, ${summary.vipRulesImported} VIP rules, and ${summary.automationRulesImported} automation rules."
                             }.onFailure { error ->
                                 restoreError = error.message ?: "Could not restore this archive."
                             }
@@ -286,6 +298,102 @@ fun SettingsScreen(
                         restoreDialog = false
                         restorePassphrase = ""
                         restoreError = null
+                    }
+                ) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (ruleDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                ruleDialog = false
+                ruleAppMenu = false
+            },
+            title = { Text("New automation rule") },
+            text = {
+                Column {
+                    Text("Match new notifications by keyword or phrase, optionally limited to one app.")
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = ruleKeyword,
+                        onValueChange = { ruleKeyword = it },
+                        label = { Text("Keyword or phrase") },
+                        placeholder = { Text("e.g. invoice, server down") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Box {
+                        OutlinedButton(
+                            onClick = { ruleAppMenu = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(rulePackage?.let { appNames[it] ?: it } ?: "Any app")
+                        }
+                        DropdownMenu(
+                            expanded = ruleAppMenu,
+                            onDismissRequest = { ruleAppMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Any app") },
+                                onClick = {
+                                    rulePackage = null
+                                    ruleAppMenu = false
+                                }
+                            )
+                            observedApps.forEach { (packageName, appName) ->
+                                DropdownMenuItem(
+                                    text = { Text(appName) },
+                                    onClick = {
+                                        rulePackage = packageName
+                                        ruleAppMenu = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Text("Action", style = MaterialTheme.typography.labelLarge)
+                    Spacer(Modifier.height(6.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(AutomationAction.entries) { action ->
+                            FilterChip(
+                                selected = ruleAction == action,
+                                onClick = { ruleAction = action },
+                                label = { Text(action.label) }
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = ruleAction.description + " Rules run on-device and apply to new alerts only. Auto-archive keeps the alert in History and never dismisses the source app's notification.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = ruleKeyword.isNotBlank(),
+                    onClick = {
+                        viewModel.addAutomationRule(ruleKeyword, rulePackage, ruleAction)
+                        ruleDialog = false
+                        ruleKeyword = ""
+                        rulePackage = null
+                        ruleAction = AutomationAction.HIGH_PRIORITY
+                        ruleAppMenu = false
+                    }
+                ) { Text("Create rule") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        ruleDialog = false
+                        ruleKeyword = ""
+                        rulePackage = null
+                        ruleAction = AutomationAction.HIGH_PRIORITY
+                        ruleAppMenu = false
                     }
                 ) { Text("Cancel") }
             }
@@ -549,6 +657,66 @@ fun SettingsScreen(
                             }
                         }
                     }
+                }
+            }
+
+            item {
+                SettingsCard(Icons.Outlined.Bolt, "Automation rules") {
+                    Text(
+                        "Act on new notifications as they arrive. Rules match on-device and never leave your phone.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    val rules = prefs.automationRules()
+                    if (rules.isEmpty()) {
+                        Text(
+                            "No rules yet. Add a keyword to auto-pin invoices, highlight server alerts, or archive recurring noise.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    } else {
+                        Column(modifier = Modifier.padding(top = 8.dp)) {
+                            rules.forEach { rule ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text("“${rule.keyword}”", fontWeight = FontWeight.Medium)
+                                        Text(
+                                            listOfNotNull(
+                                                rule.action.label,
+                                                rule.packageName?.let { appNames[it] ?: it } ?: "Any app"
+                                            ).joinToString(" · "),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Switch(
+                                        checked = rule.enabled,
+                                        onCheckedChange = {
+                                            viewModel.setAutomationRuleEnabled(rule.id, it)
+                                        }
+                                    )
+                                    IconButton(onClick = { viewModel.removeAutomationRule(rule.id) }) {
+                                        Icon(Icons.Outlined.Delete, contentDescription = "Delete rule")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    OutlinedButton(
+                        onClick = { ruleDialog = true },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                    ) { Text("Add automation rule") }
+                    Text(
+                        "Auto-archive keeps the alert in History and never dismisses the source app's notification.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
                 }
             }
 

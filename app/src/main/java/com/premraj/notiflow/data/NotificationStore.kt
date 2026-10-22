@@ -187,6 +187,68 @@ class NotificationStore(context: Context) {
         }
     }
 
+    suspend fun bulkSetState(ids: Collection<Long>, state: NotificationState) = withContext(Dispatchers.IO) {
+        if (ids.isEmpty()) return@withContext
+        mutationMutex.withLock {
+            val db = helper.writableDatabase
+            val values = ContentValues().apply {
+                put("state", state.name)
+                if (state != NotificationState.LATER) putNull("remind_at")
+                put("updated_at", System.currentTimeMillis())
+            }
+            db.beginTransaction()
+            try {
+                ids.distinct().forEach { id ->
+                    db.update(TABLE, values, "id=?", arrayOf(id.toString()))
+                }
+                db.setTransactionSuccessful()
+            } finally {
+                db.endTransaction()
+            }
+            refreshFromDb()
+        }
+    }
+
+    suspend fun bulkSetReminder(ids: Collection<Long>, remindAt: Long) = withContext(Dispatchers.IO) {
+        if (ids.isEmpty()) return@withContext
+        mutationMutex.withLock {
+            val db = helper.writableDatabase
+            val values = ContentValues().apply {
+                put("state", NotificationState.LATER.name)
+                put("remind_at", remindAt)
+                put("updated_at", System.currentTimeMillis())
+            }
+            db.beginTransaction()
+            try {
+                ids.distinct().forEach { id ->
+                    db.update(TABLE, values, "id=?", arrayOf(id.toString()))
+                }
+                db.setTransactionSuccessful()
+            } finally {
+                db.endTransaction()
+            }
+            refreshFromDb()
+        }
+    }
+
+    suspend fun bulkDelete(ids: Collection<Long>) = withContext(Dispatchers.IO) {
+        if (ids.isEmpty()) return@withContext
+        mutationMutex.withLock {
+            val db = helper.writableDatabase
+            db.beginTransaction()
+            try {
+                ids.distinct().forEach { id ->
+                    db.delete(TABLE_EXPENSES, "notification_id=?", arrayOf(id.toString()))
+                    db.delete(TABLE, "id=?", arrayOf(id.toString()))
+                }
+                db.setTransactionSuccessful()
+            } finally {
+                db.endTransaction()
+            }
+            refreshFromDb()
+        }
+    }
+
     suspend fun clearAll() = withContext(Dispatchers.IO) {
         mutationMutex.withLock {
             helper.writableDatabase.delete(TABLE_EXPENSES, null, null)

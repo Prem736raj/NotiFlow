@@ -99,6 +99,9 @@ fun NotiFlowApp(
             onSetState = viewModel::setState,
             onSetReminder = viewModel::setReminder,
             onTogglePin = { viewModel.setPinned(it, !it.pinned) },
+            onBulkSetState = viewModel::bulkSetState,
+            onBulkSnooze = viewModel::bulkSnooze,
+            onBulkDelete = viewModel::bulkDelete,
             onSectionChange = { section = it.name },
             onOpenNotification = {
                 detailId = it.id

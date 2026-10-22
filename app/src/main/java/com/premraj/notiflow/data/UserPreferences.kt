@@ -120,6 +120,58 @@ class UserPreferences internal constructor(private val prefs: SharedPreferences)
         return vipToken(packageName, sender) in rules || vipToken(packageName, null) in rules
     }
 
+    fun automationRules(): List<AutomationRule> {
+        val raw = prefs.getString(KEY_AUTOMATION_RULES, null) ?: return emptyList()
+        return runCatching {
+            val arr = JSONArray(raw)
+            buildList {
+                for (i in 0 until arr.length()) {
+                    val obj = arr.optJSONObject(i) ?: continue
+                    val id = obj.optString("id").takeIf { it.isNotBlank() } ?: continue
+                    val keyword = obj.optString("keyword").trim().takeIf { it.isNotBlank() } ?: continue
+                    val action = runCatching {
+                        AutomationAction.valueOf(obj.optString("action"))
+                    }.getOrNull() ?: continue
+                    add(
+                        AutomationRule(
+                            id = id,
+                            keyword = keyword,
+                            packageName = obj.optString("package").takeIf { it.isNotBlank() },
+                            action = action,
+                            enabled = obj.optBoolean("enabled", true)
+                        )
+                    )
+                }
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    fun addAutomationRule(rule: AutomationRule) {
+        upsertAutomationRule(rule)
+    }
+
+    fun upsertAutomationRule(rule: AutomationRule) {
+        val current = automationRules().associateBy { it.id }.toMutableMap()
+        current[rule.id] = rule
+        saveAutomationRules(current.values.toList())
+    }
+
+    fun setAutomationRuleEnabled(id: String, enabled: Boolean) {
+        val rule = automationRules().firstOrNull { it.id == id } ?: return
+        upsertAutomationRule(rule.copy(enabled = enabled))
+    }
+
+    fun removeAutomationRule(id: String) {
+        saveAutomationRules(automationRules().filterNot { it.id == id })
+    }
+
+    fun addAutomationRules(rules: List<AutomationRule>) {
+        if (rules.isEmpty()) return
+        val current = automationRules().associateBy { it.id }.toMutableMap()
+        rules.forEach { rule -> current[rule.id] = rule }
+        saveAutomationRules(current.values.toList())
+    }
+
     fun learnedPreferences(): List<LearnedPreference> {
         val raw = prefs.getString(KEY_LEARNED, null) ?: return emptyList()
         return runCatching {
@@ -179,6 +231,20 @@ class UserPreferences internal constructor(private val prefs: SharedPreferences)
         prefs.edit().clear().apply()
     }
 
+    private fun saveAutomationRules(rules: List<AutomationRule>) {
+        val arr = JSONArray()
+        rules.forEach { rule ->
+            arr.put(JSONObject().apply {
+                put("id", rule.id)
+                put("keyword", rule.keyword)
+                put("package", rule.packageName.orEmpty())
+                put("action", rule.action.name)
+                put("enabled", rule.enabled)
+            })
+        }
+        prefs.edit().putString(KEY_AUTOMATION_RULES, arr.toString()).apply()
+    }
+
     private fun saveLearned(items: List<LearnedPreference>) {
         val arr = JSONArray()
         items.forEach { p ->
@@ -213,6 +279,7 @@ class UserPreferences internal constructor(private val prefs: SharedPreferences)
         const val KEY_QUIET_CATEGORIES = "quiet_categories"
         const val KEY_VIP_RULES = "vip_rules"
         const val KEY_EXCLUDED_PACKAGES = "excluded_packages"
+        const val KEY_AUTOMATION_RULES = "automation_rules"
         const val KEY_LEARNED = "learned_preferences"
         const val KEY_APP_THEME_MODE = "app_theme_mode"
         const val KEY_USE_DYNAMIC_COLORS = "use_dynamic_colors"

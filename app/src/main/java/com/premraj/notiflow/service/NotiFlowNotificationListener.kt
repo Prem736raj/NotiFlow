@@ -18,10 +18,12 @@ import androidx.core.app.NotificationCompat
 import com.premraj.notiflow.MainActivity
 import com.premraj.notiflow.R
 import com.premraj.notiflow.appGraph
+import com.premraj.notiflow.data.AutomationEngine
 import com.premraj.notiflow.data.ClassificationResult
 import com.premraj.notiflow.data.IncomingNotification
 import com.premraj.notiflow.data.NotificationCategory
 import com.premraj.notiflow.data.NotificationPriority
+import com.premraj.notiflow.data.NotificationState
 import com.premraj.notiflow.intelligence.ActionExtractor
 import com.premraj.notiflow.intelligence.LocalIntelligence
 import com.premraj.notiflow.util.NotificationChannels
@@ -180,8 +182,24 @@ class NotiFlowNotificationListener : NotificationListenerService() {
             sender = sender
         )
 
+        val automation = AutomationEngine.evaluate(
+            rules = graph.preferences.automationRules(),
+            packageName = sbn.packageName,
+            title = title,
+            body = body,
+            sender = sender
+        )
+
         val vip = graph.preferences.isVip(sbn.packageName, sender)
-        val initial = personalizedFast
+        val initial = if (automation.highPriority) {
+            personalizedFast.copy(
+                priority = NotificationPriority.HIGH,
+                confidence = maxOf(personalizedFast.confidence, 0.9f),
+                reason = "Automation rule matched"
+            )
+        } else {
+            personalizedFast
+        }
 
         val incoming = IncomingNotification(
             key = sbn.key,
@@ -206,6 +224,14 @@ class NotiFlowNotificationListener : NotificationListenerService() {
             (initial.category == NotificationCategory.OTP || fast.category == NotificationCategory.OTP)
         ) {
             handleAutoCopyOtp(otpCode, appName, id)
+        }
+
+        val storedBeforeAutomationActions = graph.store.get(id) ?: return
+        if (automation.pin && storedBeforeAutomationActions.state == NotificationState.ACTIVE && !storedBeforeAutomationActions.pinned) {
+            graph.store.setPinned(id, true)
+        }
+        if (automation.archive && storedBeforeAutomationActions.state == NotificationState.ACTIVE) {
+            graph.store.setState(id, NotificationState.ARCHIVED)
         }
 
         val stored = graph.store.get(id) ?: return

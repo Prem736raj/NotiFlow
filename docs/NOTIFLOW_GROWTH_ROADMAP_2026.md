@@ -8,25 +8,25 @@
 
 ## 1. Executive decision
 
-**Current product / engineering readiness: 5.9/10 (provisional).** There is a substantial working implementation, but crucial quality evidence is missing. **Production launch readiness: 3/10.** Two release gates are demonstrably unmet: the generated release bundle uses an Android Debug certificate, and the privacy policy link used in the app returns HTTP 404.
+**Current product / engineering readiness: 5.9/10 (provisional).** There is a substantial working implementation, but crucial quality evidence is missing. **Production launch readiness: 3/10.** Release gates remain unmet: there is no production upload certificate or Play Console review, and physical-device sign-off is missing. The privacy policy is now hosted and returned HTTP 200 on 22 October 2026.
 
 **Recommended product direction:** "Your private inbox for notifications that need action." Concentrate on dependable capture, finding missed alerts, putting important items into a follow-up queue, and delivering reminders. Keep banking/UPI insights optional and secondary. Differentiate through the *outcome* users get; "notification history", "rules", "offline", and generic "AI" by themselves are already claimed by competitors.
 
 **Launch decision:** Do not submit the currently generated release AAB to a production track. Complete the P0 gates, then run a real-device beta before expanding acquisition.
 
-**Implementation progress (22 October 2026, local changes pending commit):** The release-signing debug fallback was removed, a signing prerequisite added to release packaging, CI configured to build with a short-lived test-only certificate, and the public-only Pages workflow added. The inactive local AI/model, Focus Mode, Smart Presets, voice reader, unwanted-cleanup prompt, and anti-revoke toggle were removed; the policy is embedded in-app; encrypted archive restore and device-credential app lock were added. Production upload credentials, a publicly reachable hosted policy, the Play Console review, and physical-device sign-off remain incomplete; see [release preparation](RELEASE_PREPARATION.md).
+**Implementation progress (22 October 2026, local changes pending commit):** The release-signing debug fallback was removed, a signing prerequisite added to release packaging, CI configured to build with a short-lived test-only certificate, and the public-only Pages workflow added. The inactive local AI/model, Focus Mode, Smart Presets, voice reader, unwanted-cleanup prompt, and anti-revoke toggle were removed; the policy is embedded in-app; encrypted archive restore and device-credential app lock were added. The current work adds on-device keyword automation rules (pin, high priority, auto-archive), multi-select bulk triage, archive support for automation rules, and an aggregate-count home-screen widget. Production upload credentials, the Play Console review, and physical-device sign-off remain incomplete; the hosted policy now returns HTTP 200. See [release preparation](RELEASE_PREPARATION.md).
 
 ### Evidence and confidence
 
 | Signal | Finding | Confidence / limitation |
 | --- | --- | --- |
 | Kotlin/Compose project | Material 3, minSdk 24, targetSdk 37, local SQLite and WorkManager | Source inspected |
-| Features | Notification listener, history, priority scoring, search, Later, reminders, digests, VIP/quiet rules, exclusion/masking, optional expense parsing, encrypted export/restore, optional app lock | Source present; device behavior not comprehensively validated |
-| Checks | testDebugUnitTest, lintDebug, assembleDebug completed successfully; 75 tests, 0 failures, 0 skipped across 12 suites | Local run on 22 October 2026 |
-| AAB | The checked-in 6.4 MB release AAB predates the explicit signing prerequisite and must be rebuilt with an upload key | Local artifact inspected; not Play-ready |
+| Features | Notification listener, history, priority scoring, search, Later, reminders, digests, VIP/quiet rules, exclusion/masking, keyword automation rules, bulk triage, aggregate-count widget, optional expense parsing, encrypted export/restore, optional app lock | Source present; device behavior not comprehensively validated |
+| Checks | testDebugUnitTest, lintDebug, assembleDebug completed successfully; 82 tests, 0 failures, 0 skipped across 13 suites | Local run on 22 October 2026 |
+| AAB | The checked-in release AAB predates the explicit signing prerequisite and must be rebuilt with an upload key | Local artifact inspected; not Play-ready |
 | Release signing | Release packaging now fails without an explicit non-debug upload keystore | Source verified locally; production key still required |
-| Privacy URL | In-app URL https://prem736raj.github.io/NotiFlow/privacy-policy returns 404; Pages site root, directory and .html variants also return 404 | HTTP checks on 21 October 2026; policy HTML exists in the repository but is not published at these URLs |
-| Google Pages API | Unauthenticated public /repos/Prem736raj/NotiFlow/pages request returns 404 | Does not by itself prove the repository's Pages setting; independently confirms deployment/configuration needs owner verification |
+| Privacy URL | https://prem736raj.github.io/NotiFlow/ and /privacy-policy/ return HTTP 200 | HTTP checks on 22 October 2026 after successful Pages deployment |
+| GitHub Pages | Enabled through the public-only Actions workflow | Verified 22 October 2026; recheck after policy or repository changes |
 | Generative AI | The local model path was removed; classification and digest summaries are deterministic and on-device | Source inspected; no generative-model runtime is packaged |
 | Device quality | Pixel/Google, Samsung/One UI and Xiaomi/HyperOS reliability; battery; notification listener recovery; reminder timeliness | **Unknown until physical-device tests** |
 | Market | Google Play competitor listings and official competitor site consulted | Public listing claims, not independent side-by-side device benchmarks |
@@ -38,14 +38,14 @@ Scores describe **present state**, not future potential. They are an engineering
 | Dimension | Weight | Score / 10 | Weighted points | Reason |
 | --- | ---: | ---: | ---: | --- |
 | Core feature completeness | 20% | 8 | 1.60 | Large functional set in source |
-| Reliability and testing | 20% | 6 | 1.20 | 76 unit tests/lint pass; real-world capture and OEM testing missing |
+| Reliability and testing | 20% | 6 | 1.20 | 82 unit tests/lint pass; real-world capture and OEM testing missing |
 | Privacy/security | 15% | 7 | 1.05 | Local processing, consent controls, encrypted exports; release/disclosure gates and restore gaps |
 | UI/UX | 15% | 6 | 0.90 | Many screens, but first-use comprehension and current screenshots need testing |
 | Differentiation | 10% | 6 | 0.60 | Reminders + private notification workflow promising, category crowded |
 | Performance | 5% | 5 | 0.25 | Small bundle, no battery, database growth or latency measurements |
-| Generative AI capability | 5% | 1 | 0.05 | Stub/fallback only |
-| Play release readiness | 10% | 2 | 0.20 | Debug signing and broken hosted policy |
-| **Total** | **100%** | | **5.85 → 5.9/10** | Provisional |
+| Generative AI capability | 5% | 0 | 0.00 | Local-model path removed; deterministic on-device rules only |
+| Play release readiness | 10% | 3 | 0.30 | Production signing and Play Console gates incomplete |
+| **Total** | **100%** | | **5.90 → 5.9/10** | Provisional |
 
 Separate **launch readiness 3/10** is a gate assessment and is **not** the weighted average. Targets: 7+/10 after P0 and device proof; **8+/10 is conditional** on demonstrable user benefit, retention and stability. Do not promise a score by a fixed date.
 
@@ -75,10 +75,10 @@ No dates are guarantees; sequence assumes a solo developer working part time and
 | ID | Work item | Specific implementation / verification | Definition of done |
 | --- | --- | --- | --- |
 | P0-01 | Production signing | Remove the silent Android Debug-key fallback from app/build.gradle.kts. Require explicit upload-key path, alias and passwords for production signing; keep debug test builds separate. Do not generate or commit a key/password. Verify bundle certificate with keytool. | Release tasks fail clearly without production credentials and a signed release has the expected **non-debug** upload certificate; upload key backed up securely. |
-| P0-02 | Publish policy site | The policy source exists at docs/privacy-policy/index.html and docs/privacy-policy.html, but **every tested prem736raj.github.io/NotiFlow route is 404**. Configure a real GitHub Pages deployment for docs/ (or a reliable alternative), then check public URL on mobile/incognito. | Public policy page returns HTTP 200 via HTTPS; homepage links resolve; app's exact URL and Play Console URL match an accessible, final policy. |
+| P0-02 | Publish policy site | **Complete (22 October 2026):** the public-only Pages workflow publishes docs/privacy-policy/index.html and docs/privacy-policy.html; the homepage and policy route returned HTTP 200. Recheck after any policy edit. | Public policy page returns HTTP 200 via HTTPS; homepage links resolve; app's exact URL and Play Console URL match an accessible, final policy. |
 | P0-03 | Privacy text and disclosure | Review actual notification, OTP, sender, financial, clipboard and archive behavior against policy; verify visible disclosure *before* the notification access permission flow; ensure affirmative consent and decline paths. | Reviewer can see what access reads, why, local processing and sharing/retention rules; policy and Data Safety declarations agree with the shipped binary. |
 | P0-04 | Play Console readiness | Check current target API rules, access declarations, content rating, Data Safety, store listing, developer contact, permissions, signing/enrollment and app access; review whether a 12-tester/14-day closed-test requirement applies to the developer account. | All relevant Console checklist items complete; tester access and review flow documented; no contradictory marketing claims. |
-| P0-05 | Safety regression on devices | On ≥3 device/OEM classes, grant/revoke notification access; receive OTP and payment notifications; enable focus; create/delete reminders; verify locked-screen previews and voice behavior. | No dangerous loss of OTP/payment alerts; no sensitive previews/voice disclosures in disallowed states; critical paths recorded with reproducible results. |
+| P0-05 | Safety regression on devices | On ≥3 device/OEM classes, grant/revoke notification access; receive OTP and payment notifications; exercise automation rules, bulk triage and the widget; create/delete reminders; verify locked-screen previews. | No dangerous loss of OTP/payment alerts; no sensitive previews or widget content leakage; critical paths recorded with reproducible results. |
 | P0-06 | Release identity | Confirm versionCode/versionName, Play App Signing upload certificate and an install test through internal/closed track using the actual candidate artifact. | Signed AAB accepted by target testing track, installs and launches on test devices; no unexpected permission or native ABI issues. |
 
 **Policy caveat:** Automatically uploading notification content or finance information for analytics/debugging would materially change the privacy/security posture. The Google Play User Data policy explicitly demands adequate disclosure and consent for sensitive content. Do not introduce that collection to measure growth.
@@ -92,7 +92,7 @@ keytool -printcert -jarfile app\build\outputs\bundle\release\app-release.aab
 Invoke-WebRequest -Uri "https://prem736raj.github.io/NotiFlow/privacy-policy/" -UseBasicParsing
 ~~~
 
-The policy URL shown here is the intended directory route; it is **currently broken**. Do not treat this command as a success until the deployment is corrected.
+The policy URL shown here is the intended directory route; it returned HTTP 200 on 22 October 2026. Re-run the check after any policy or Pages change.
 
 ## 4. P1 — Reliability, performance, and trust (weeks 3–6; 25–45 hours)
 
@@ -101,7 +101,7 @@ The policy URL shown here is the intended directory route; it is **currently bro
 | 1 | Listener lifecycle hardening: when disconnected, show access health, respect Android's onListenerDisconnected semantics, and consider safe requestRebind with throttling and no battery-hungry polling | Across reboots, force stops, revoked permission and system recovery, users see an honest status and capture resumes when Android permits |
 | 2 | Device matrix: Pixel/AOSP, Samsung/One UI, Xiaomi/HyperOS, Android API levels 24/29/33/35/37 when available | Log coverage gaps; ensure manufacturer battery restrictions are explained without implying bypass guarantees |
 | 3 | Reminder/digest reliability: distinguish flexible WorkManager windows from exact alarms; test timezone/DST, reboot, Doze, permission denial and repeated schedules | Report actual delivery delay distributions; no claim of minute-exact delivery from periodic WorkManager |
-| 4 | Classification fixtures: collect **synthetic or explicitly consented/redacted** OTP/payment/chat/promotional samples; measure false suppression and mistaken finance entries | Zero known unsafe focus cancellation on protected classes; no automatic finance totals for low-confidence messages |
+| 4 | Classification fixtures: collect **synthetic or explicitly consented/redacted** OTP/payment/chat/promotional samples; measure false suppression and mistaken finance entries | Zero known unsafe quiet cancellation on protected classes; no automatic finance totals for low-confidence messages |
 | 5 | Security/export: update password strength guidance, archive format/version tests; decide whether to ship validated import/restore or label as export-only | Corrupt/wrong-password archives never produce success; user can tell precisely what is backed up |
 | 6 | Instrument observability privately: on-device health dashboard (listener active, last seen event, work status, local storage) and consent-based diagnostics that **never include notification text** | Testers can identify broken capture and submit redacted issue reports |
 | 7 | Performance profiles: cold start, scrolling with 1K/10K/50K history rows, query latency, memory, battery, WorkManager frequency, database retention growth | Establish baselines; no unbounded storage/CPU growth; regressions captured in release notes |
@@ -169,7 +169,7 @@ Definitions matter more than an impressive download count. Use Play Console aggr
 | Reminder success | Reminders delivered within the **stated** scheduling tolerance / reminders due on supported test devices | ≥95%; publish tolerance honestly |
 | Capture reliability | Listener-observed test notifications persisted correctly / eligible test notifications posted in controlled runs | ≥99% in lab matrix; exclude OS-inaccessible events |
 | D1 and D7 retention | Install cohort active on day 1 and day 7 respectively / cohort installs; use one reporting definition consistently | D7 ≥25% as a **hypothesis to test**, not an industry benchmark |
-| Weekly value | Weekly activated users who complete a Later action, reminder, retrieval or protected-focus event | Trend increasing with qualified users |
+| Weekly value | Weekly activated users who complete a Later action, reminder, retrieval or protected-alert event | Trend increasing with qualified users |
 | Store conversion | First-time installations / eligible Play listing visitors, segmented by country/source | Establish baseline and experiment only with enough traffic |
 | App quality | Play user-perceived crash/ANR rates, sorted by affected users and device | Stay materially below Play bad-behavior thresholds; trend to zero |
 | Support latency | Median time to first response for a reported capture, privacy or data-loss issue | Respond within 2 working days while beta is small |
@@ -201,7 +201,7 @@ At approximately **10–15 development hours per week**, P0 + cross-device stabi
 | Risk | Impact | Mitigation / owner action |
 | --- | --- | --- |
 | Debug-signed release | Play signing identity failure / unsafe release discipline | Configure actual upload key; forbid silent fallback; verify the final certificate |
-| Policy URL unreachable | Trust and Play compliance risk | Publish docs/ policy via Pages or alternate host; verify public 200 before changing in-app link |
+| Policy URL regression | Trust and Play compliance risk | Recheck the Pages homepage and policy route after every policy edit; keep the Play Console URL identical to the verified endpoint |
 | Notification Access denial/revocation/OEM kill | App becomes useless or misleading | Health UI, clear permissions support, field matrix, safe recovery |
 | Quieting important alerts | User harm, lost trust | OTP/payment/VIP protections + high-quality tests and undo |
 | Incorrect finance parsing | Misleading totals | Explicit opt-in, confidence, source reconciliation, manual corrections |
@@ -219,7 +219,7 @@ At approximately **10–15 development hours per week**, P0 + cross-device stabi
 
 ### Exact next steps for the maintainer
 
-1. **Set up publishing:** choose GitHub Pages deployment for docs/ or another HTTPS host. Verify that https://prem736raj.github.io/NotiFlow/privacy-policy/ returns 200; until then the current policy URL is broken. Update Play Console and in-app URL only to a verified public endpoint.
+1. **Verify publishing:** recheck that https://prem736raj.github.io/NotiFlow/privacy-policy/ returns 200 after any policy change and use that exact endpoint in Play Console. It returned HTTP 200 on 22 October 2026.
 2. **Secure signing:** provision and back up an upload keystore outside Git; remove debug fallback; make missing release credentials fail; verify keytool certificate and test AAB acceptance.
 3. **Recruit beta:** run a two-week controlled test with real Android devices, including Samsung/Xiaomi and consent flows. Check whether the developer account has a mandatory 12-person/14-day requirement.
 4. **Ship health and reminders:** listener status/recovery, honest scheduling copy and follow-up UX before major new features.

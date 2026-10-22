@@ -8,6 +8,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.premraj.notiflow.appGraph
 import com.premraj.notiflow.data.AppThemeMode
+import com.premraj.notiflow.data.AutomationAction
+import com.premraj.notiflow.data.AutomationRule
 import com.premraj.notiflow.data.ExpenseCategory
 import com.premraj.notiflow.data.ExpenseSummary
 import com.premraj.notiflow.data.ExpenseTimeRange
@@ -32,10 +34,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Calendar
+import java.util.UUID
 
 data class RestoreSummary(
     val notificationsImported: Int,
-    val vipRulesImported: Int
+    val vipRulesImported: Int,
+    val automationRulesImported: Int = 0
 )
 
 class NotiFlowViewModel(application: Application) : AndroidViewModel(application) {
@@ -140,6 +144,30 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
     fun delete(id: Long) = viewModelScope.launch {
         graph.workScheduler.cancelReminder(id)
         graph.store.delete(id)
+        refreshStorageStats()
+    }
+
+    fun bulkSetState(ids: Set<Long>, state: NotificationState) = viewModelScope.launch {
+        if (ids.isEmpty()) return@launch
+        graph.store.bulkSetState(ids, state)
+        if (state != NotificationState.LATER) {
+            ids.forEach { graph.workScheduler.cancelReminder(it) }
+        }
+        refreshStorageStats()
+    }
+
+    fun bulkSnooze(ids: Set<Long>, triggerAtMillis: Long) = viewModelScope.launch {
+        if (ids.isEmpty()) return@launch
+        graph.store.bulkSetReminder(ids, triggerAtMillis)
+        ids.forEach { graph.workScheduler.scheduleReminder(it, triggerAtMillis) }
+        MetricsTracker.recordEvent(getApplication(), MetricsTracker.EVENT_REMINDER_SCHEDULED)
+        refreshStorageStats()
+    }
+
+    fun bulkDelete(ids: Set<Long>) = viewModelScope.launch {
+        if (ids.isEmpty()) return@launch
+        ids.forEach { graph.workScheduler.cancelReminder(it) }
+        graph.store.bulkDelete(ids)
         refreshStorageStats()
     }
 
@@ -262,6 +290,30 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
         bumpPrefs()
     }
 
+    fun addAutomationRule(keyword: String, packageName: String?, action: AutomationAction) {
+        val normalized = keyword.trim()
+        if (normalized.isEmpty()) return
+        graph.preferences.addAutomationRule(
+            AutomationRule(
+                id = UUID.randomUUID().toString(),
+                keyword = normalized,
+                packageName = packageName?.takeIf { it.isNotBlank() },
+                action = action
+            )
+        )
+        bumpPrefs()
+    }
+
+    fun setAutomationRuleEnabled(id: String, enabled: Boolean) {
+        graph.preferences.setAutomationRuleEnabled(id, enabled)
+        bumpPrefs()
+    }
+
+    fun removeAutomationRule(id: String) {
+        graph.preferences.removeAutomationRule(id)
+        bumpPrefs()
+    }
+
     fun removeLearnedPreference(token: String) {
         val pkg = token.substringBefore('|')
         val sender = token.substringAfter('|').takeIf { it.isNotBlank() }
@@ -332,12 +384,17 @@ class NotiFlowViewModel(application: Application) : AndroidViewModel(application
                 }
             }
 
+            val rulesBefore = graph.preferences.automationRules().mapTo(mutableSetOf()) { it.id }
+            val restoredRules = BackupExporter.automationRulesFromArchive(root)
+            graph.preferences.addAutomationRules(restoredRules)
+
             _observedApps.value = graph.store.observedApps()
             _storageStats.value = graph.store.storageStats()
             bumpPrefs()
             RestoreSummary(
                 notificationsImported = imported,
-                vipRulesImported = (graph.preferences.vipRules() - before).size
+                vipRulesImported = (graph.preferences.vipRules() - before).size,
+                automationRulesImported = restoredRules.count { it.id !in rulesBefore }
             )
         }
 

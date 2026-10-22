@@ -40,7 +40,7 @@ The privacy source is docs/privacy-policy/index.html. The Pages workflow at .git
 4. Review policy accuracy, developer contact and effective date against the final binary. Configure the same **working** URL in Play Console.
 5. If repository name or domain changes, update the Play Console URL and the optional public site; the in-app policy remains self-contained.
 
-**At implementation time:** GitHub Pages API and the public URL returned HTTP 404. Adding this workflow locally has not created a deployed page. P0-02 is incomplete until HTTP 200 is observed.
+**Current state (2026-10-22):** GitHub Pages is enabled via the Actions workflow, and both the homepage and policy route returned HTTP 200 after successful deployment. Re-check the exact final policy URL and content after any policy change or repository rename; Play Console must use that same accessible URL.
 
 ## Remaining Play/device checks
 

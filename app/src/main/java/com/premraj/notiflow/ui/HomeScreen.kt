@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -25,8 +26,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.CheckBox
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.NotificationsOff
@@ -35,6 +40,7 @@ import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.automirrored.outlined.ViewList
 import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -50,11 +56,16 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -97,6 +108,9 @@ fun HomeScreen(
     onSetState: (Long, NotificationState) -> Unit = { _, _ -> },
     onSetReminder: (Long, Long?) -> Unit = { _, _ -> },
     onTogglePin: (NotificationItem) -> Unit = {},
+    onBulkSetState: (Set<Long>, NotificationState) -> Unit = { _, _ -> },
+    onBulkSnooze: (Set<Long>, Long) -> Unit = { _, _ -> },
+    onBulkDelete: (Set<Long>) -> Unit = {},
     onSectionChange: (HomeSection) -> Unit,
     onOpenNotification: (NotificationItem) -> Unit,
     onSearch: () -> Unit,
@@ -106,6 +120,29 @@ fun HomeScreen(
     val dark = LocalNotiFlowDarkTheme.current
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+    var selectionMode by remember { mutableStateOf(false) }
+    var selectedIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var bulkDeleteConfirm by remember { mutableStateOf(false) }
+
+    fun exitSelection() {
+        selectionMode = false
+        selectedIds = emptySet()
+        bulkDeleteConfirm = false
+    }
+
+    fun showBulkResult(message: String) {
+        coroutineScope.launch {
+            snackbarHostState.currentSnackbarData?.dismiss()
+            snackbarHostState.showSnackbar(message, duration = SnackbarDuration.Short)
+        }
+        exitSelection()
+    }
+
+    LaunchedEffect(selectedSection) {
+        selectionMode = false
+        selectedIds = emptySet()
+        bulkDeleteConfirm = false
+    }
 
     val nowItems = notifications.filter {
         it.state == NotificationState.ACTIVE &&
@@ -137,79 +174,174 @@ fun HomeScreen(
 
     val highPriorityCount = nowItems.count { LocalIntelligence.effectivePriority(it) == NotificationPriority.HIGH }
 
+    if (bulkDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { bulkDeleteConfirm = false },
+            title = { Text("Delete ${selectedIds.size} notifications?") },
+            text = { Text("This permanently removes the selected entries from NotiFlow history. Source apps and their notifications are unaffected.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val ids = selectedIds
+                        onBulkDelete(ids)
+                        showBulkResult("Deleted ${ids.size} notifications")
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { bulkDeleteConfirm = false }) { Text("Cancel") }
+            }
+        )
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        bottomBar = {
+            if (selectionMode) {
+                BulkActionBar(
+                    selectedCount = selectedIds.size,
+                    onDone = {
+                        val ids = selectedIds
+                        onBulkSetState(ids, NotificationState.DONE)
+                        showBulkResult("Marked ${ids.size} as Done")
+                    },
+                    onSnooze = {
+                        val ids = selectedIds
+                        onBulkSnooze(ids, System.currentTimeMillis() + 60 * 60 * 1000L)
+                        showBulkResult("Snoozed ${ids.size} for 1 hour")
+                    },
+                    onArchive = {
+                        val ids = selectedIds
+                        onBulkSetState(ids, NotificationState.ARCHIVED)
+                        showBulkResult("Archived ${ids.size} notifications")
+                    },
+                    onDelete = { bulkDeleteConfirm = true }
+                )
+            }
+        },
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background
                 ),
+                navigationIcon = {
+                    if (selectionMode) {
+                        IconButton(onClick = { exitSelection() }) {
+                            Icon(Icons.Outlined.Close, contentDescription = "Cancel selection")
+                        }
+                    }
+                },
                 title = {
                     Column {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Image(
-                                painter = painterResource(R.drawable.app_logo),
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                            )
+                        if (selectionMode) {
                             Text(
-                                text = "NotiFlow",
+                                text = "${selectedIds.size} selected",
                                 style = MaterialTheme.typography.headlineSmall,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
+                            Text(
+                                text = "Tap alerts to add or remove them",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Image(
+                                    painter = painterResource(R.drawable.app_logo),
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                )
+                                Text(
+                                    text = "NotiFlow",
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            Text(
+                                text = when (selectedSection) {
+                                    HomeSection.NOW -> "Important alerts needing attention"
+                                    HomeSection.LATER -> "Follow-up queue & scheduled reminders"
+                                    HomeSection.DIGEST -> "Low-priority noise, contained"
+                                    HomeSection.HISTORY -> "Completed, archived, and past alerts"
+                                    HomeSection.DELETED -> "Removed by source apps, preserved in NotiFlow"
+                                    HomeSection.EXPENSES -> "100% offline bank & UPI spending tracker"
+                                    HomeSection.INSIGHTS -> "Notification activity & distraction insights"
+                                },
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
-                        Text(
-                            text = when (selectedSection) {
-                                HomeSection.NOW -> "Important alerts needing attention"
-                                HomeSection.LATER -> "Follow-up queue & scheduled reminders"
-                                HomeSection.DIGEST -> "Low-priority noise, contained"
-                                HomeSection.HISTORY -> "Completed, archived, and past alerts"
-                                HomeSection.DELETED -> "Removed by source apps, preserved in NotiFlow"
-                                HomeSection.EXPENSES -> "100% offline bank & UPI spending tracker"
-                                HomeSection.INSIGHTS -> "Notification activity & distraction insights"
-                            },
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
                     }
                 },
                 actions = {
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        IconButton(onClick = onSearch) {
-                            Icon(
-                                Icons.Outlined.Search,
-                                contentDescription = "Search",
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(20.dp)
+                    if (selectionMode) {
+                        TextButton(
+                            onClick = {
+                                val allSelected = visible.isNotEmpty() && selectedIds.size == visible.size
+                                selectedIds = if (allSelected) emptySet() else visible.map { it.id }.toSet()
+                            }
+                        ) {
+                            Text(
+                                if (selectedIds.size == visible.size && visible.isNotEmpty()) "Clear all" else "Select all"
                             )
                         }
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        IconButton(onClick = onSettings) {
-                            Icon(
-                                Icons.Outlined.Settings,
-                                contentDescription = "Settings",
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(20.dp)
-                            )
+                    } else {
+                        if (visible.isNotEmpty()) {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                IconButton(onClick = { selectionMode = true }) {
+                                    Icon(
+                                        Icons.Outlined.CheckBox,
+                                        contentDescription = "Select notifications",
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.width(8.dp))
                         }
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            IconButton(onClick = onSearch) {
+                                Icon(
+                                    Icons.Outlined.Search,
+                                    contentDescription = "Search",
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            IconButton(onClick = onSettings) {
+                                Icon(
+                                    Icons.Outlined.Settings,
+                                    contentDescription = "Settings",
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(12.dp))
                     }
-                    Spacer(Modifier.width(12.dp))
                 }
             )
         }
@@ -436,7 +568,17 @@ fun HomeScreen(
                     NotificationCard(
                         item = item,
                         hideSensitive = hideSensitive,
-                        onClick = { onOpenNotification(item) },
+                        onClick = {
+                            if (selectionMode) {
+                                selectedIds = if (item.id in selectedIds) {
+                                    selectedIds - item.id
+                                } else {
+                                    selectedIds + item.id
+                                }
+                            } else {
+                                onOpenNotification(item)
+                            }
+                        },
                         onQuickRemind = { triggerAtMillis ->
                             val prevState = item.state
                             val prevReminder = item.remindAt
@@ -476,11 +618,94 @@ fun HomeScreen(
                         onQuickTogglePin = {
                             onTogglePin(item)
                         },
+                        selectionMode = selectionMode,
+                        selected = item.id in selectedIds,
                         modifier = Modifier.padding(horizontal = 16.dp)
                     )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun BulkActionBar(
+    selectedCount: Int,
+    onDone: () -> Unit,
+    onSnooze: () -> Unit,
+    onArchive: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Surface(
+        tonalElevation = 3.dp,
+        shadowElevation = 8.dp,
+        color = MaterialTheme.colorScheme.surfaceContainer
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 8.dp, vertical = 6.dp)
+        ) {
+            BulkAction(
+                icon = Icons.Outlined.CheckCircle,
+                label = "Done",
+                enabled = selectedCount > 0,
+                onClick = onDone,
+                modifier = Modifier.weight(1f)
+            )
+            BulkAction(
+                icon = Icons.Outlined.AccessTime,
+                label = "1 hour",
+                enabled = selectedCount > 0,
+                onClick = onSnooze,
+                modifier = Modifier.weight(1f)
+            )
+            BulkAction(
+                icon = Icons.Outlined.Archive,
+                label = "Archive",
+                enabled = selectedCount > 0,
+                onClick = onArchive,
+                modifier = Modifier.weight(1f)
+            )
+            BulkAction(
+                icon = Icons.Outlined.Delete,
+                label = "Delete",
+                enabled = selectedCount > 0,
+                onClick = onDelete,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun BulkAction(
+    icon: ImageVector,
+    label: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+            modifier = Modifier.size(22.dp)
+        )
+        Spacer(Modifier.height(3.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline
+        )
     }
 }
 

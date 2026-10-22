@@ -12,18 +12,21 @@ NotiFlow is an Android notification inbox focused on local-first notification hi
 - Persistent SQLite notification history with update-by-notification-key behavior.
 - Rules-first local classification; the core path does not require cloud AI.
 - Pin, state, reminder, VIP, learned preference, search, digest, cleanup, and expense-domain code exists.
+- Keyword automation rules can auto-pin, raise priority, or archive matching alerts on-device.
+- Multi-select bulk triage in the inbox supports Done, one-hour snooze, Archive, and Delete.
+- An optional home-screen widget shows aggregate alert counts only; it never exposes titles, bodies, senders, OTPs, or expense data.
 - The privacy policy is embedded in the app and works offline; no external URL is required.
 - Group-summary and ongoing/foreground-service notifications are filtered before persistence.
 - Quiet-source/category cancellation is restricted to final, high-confidence low-priority promotion/spam/social classifications and protects VIP, pinned, OTP, and payment signals.
 - OTP clipboard content is marked sensitive on supported Android versions, and OTP auto-copy is opt-in.
 - Android app backup is disabled with `android:allowBackup="false"`.
 - Optional app lock delegates to the device screen lock; NotiFlow stores no separate PIN or password.
-- Encrypted archive export can be restored into local notification history and VIP rules with duplicate-key protection; reminder schedules are not recreated.
+- Encrypted archive export can be restored into local notification history, VIP rules, and automation rules with duplicate-key protection; reminder schedules are not recreated.
 - Gradle wrapper files are committed.
 
 ### Partial or intentionally constrained
 
-- **Encrypted archive export:** v3 archives are password-protected and include notification fields plus VIP rules. Restore is available in Settings and skips duplicate notification keys; derived expense rows are not included in the archive.
+- **Encrypted archive export:** v3 archives are password-protected and include notification fields, VIP rules, and automation rules. Restore is available in Settings and skips duplicate notification keys; derived expense rows are not included in the archive.
 - **Removed surface area:** the non-functional local AI/model path, Focus Mode, Smart Presets, voice reader, unwanted-cleanup prompt, and anti-revoke toggle have been deleted from the app rather than left as misleading toggles.
 
 ## Privacy model
@@ -72,7 +75,7 @@ The repository also contains `.github/workflows/android.yml`, which requests uni
 
 ## Device verification still required
 
-NotificationListenerService behavior, notification cancellation, clipboard presentation, WorkManager/OEM scheduling, reboot/rebind behavior, and lock-screen behavior require physical-device coverage. At minimum test Android 13, 14, 15, 16, and the newest supported release across AOSP/Pixel plus major OEMs where available.
+NotificationListenerService behavior, notification cancellation, clipboard presentation, WorkManager/OEM scheduling, reboot/rebind behavior, and lock-screen behavior require physical-device coverage. The home-screen widget and bulk-selection gestures also need launcher/device verification. At minimum test Android 13, 14, 15, 16, and the newest supported release across AOSP/Pixel plus major OEMs where available.
 
 ## Audit
 

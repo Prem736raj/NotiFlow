@@ -2,7 +2,7 @@
 
 > Historical ledger. The inactive local AI/model, Focus Mode, Smart Presets, voice reader, unwanted-cleanup prompt, and anti-revoke toggle described below were removed from the current source. Archive restore, safe defaults, and device-credential app lock have since been implemented. Treat this file as audit history, not a current feature list.
 >
-> Current-state corrections (2026-10-22): GitHub Pages is not currently enabled, so release-gate/scorecard references to a live privacy URL are historical and the policy is embedded in-app; encrypted archive restore is implemented for v3 archives; native library declarations for the removed generative-model runtime are gone.
+> Current-state corrections (2026-10-22): GitHub Pages is enabled and both the public homepage and privacy-policy URL returned HTTP 200 after the Pages workflow succeeded; encrypted archive restore is implemented for v3 archives including VIP and automation rules; native library declarations for the removed generative-model runtime are gone. Release-signing gates, Play Console review, and physical-device verification remain external.
 
 Audit branch: `astra/notiflow-production-hardening`  
 Baseline branch: `main`  

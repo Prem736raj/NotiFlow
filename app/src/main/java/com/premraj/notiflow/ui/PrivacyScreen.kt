@@ -59,7 +59,7 @@ fun PrivacyScreen(onBack: () -> Unit) {
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Effective September 29, 2026 · Developer: Prem Raj · com.premraj.notiflow",
+                    "Effective October 22, 2026 · Developer: Prem Raj · com.premraj.notiflow",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -83,7 +83,7 @@ fun PrivacyScreen(onBack: () -> Unit) {
             item {
                 PolicySection("2. How data is used") {
                     Text(
-                        "Captured content is used only to provide the features you choose: local history, rules-based categories and priority, search, reminders, optional OTP clipboard copying, optional expense tracking, and optional encrypted export. Notification content is never used for advertising or sold to third parties."
+                        "Captured content is used only to provide the features you choose: local history, rules-based categories and priority, keyword automation rules, search, reminders, optional OTP clipboard copying, optional expense tracking, and optional encrypted export. Automation rules run on-device and only act on notifications you configure. Notification content is never used for advertising or sold to third parties."
                     )
                 }
             }
@@ -91,7 +91,7 @@ fun PrivacyScreen(onBack: () -> Unit) {
             item {
                 PolicySection("3. Storage and security") {
                     Text(
-                        "Notification records and derived expense rows are stored in NotiFlow's private SQLite database. Android cloud backup is disabled. Encrypted exports use AES-GCM with a key derived from your passphrase and are shared only through Android's file provider when you choose to export. Optional app lock uses your device's existing screen lock; NotiFlow does not store a separate password."
+                        "Notification records, automation rules, and derived expense rows are stored in NotiFlow's private SQLite database and preferences. Android cloud backup is disabled. Encrypted exports include notification records, VIP rules, and automation rules; they use AES-GCM with a key derived from your passphrase and are shared only through Android's file provider when you choose to export. Optional app lock uses your device's existing screen lock; NotiFlow does not store a separate password. The optional home-screen widget displays alert counts only and never notification titles or message content."
                     )
                 }
             }

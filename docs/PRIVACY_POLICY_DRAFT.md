@@ -23,7 +23,8 @@ NotiFlow uses captured notification content for user-facing features such as:
 
 - local notification history/inbox;
 - rules-based categorization and priority;
-- search, reminders, VIP rules, and digest summaries;
+- search, reminders, VIP rules, automation rules, and digest summaries;
+- an optional home-screen widget that displays aggregate alert counts only;
 - optional OTP clipboard copying when the user explicitly enables it;
 - optional transaction/expense derivation when the user explicitly enables it;
 - optional local text-generation/classification only if a production-verified local model feature is enabled in a future release.
@@ -32,7 +33,7 @@ Notification Access is used for the notification-inbox product itself, not for a
 
 ## On-device storage
 
-Captured notification history is stored in NotiFlow's application-private SQLite database on the device. Derived expense records can include financial information from supported transaction notifications.
+Captured notification history is stored in NotiFlow's application-private SQLite database on the device. Automation rules and other settings are stored in application-private preferences. Derived expense records can include financial information from supported transaction notifications.
 
 Android application backup is disabled by the app manifest. That does not mean the SQLite database is cryptographically encrypted at rest; the database is protected primarily by Android's application sandbox. The project must not claim stronger at-rest encryption unless it is actually implemented and verified.
 
@@ -88,7 +89,9 @@ Before release, all deletion paths must be device/integration-tested for notific
 
 Backup export requires a user-provided passphrase; NotiFlow does not use a universal built-in backup password.
 
-The current version-3 archive includes notification fields and VIP rules. Restore is transactional and skips duplicate notification keys; reminder schedules are not recreated. Derived expense rows are exported separately as CSV and are not included in the encrypted archive.
+The current version-3 archive includes notification fields, VIP rules, and automation rules. Restore is transactional and skips duplicate notification keys; reminder schedules are not recreated. Derived expense rows are exported separately as CSV and are not included in the encrypted archive.
+
+The optional home-screen widget displays aggregate counts only. It never receives notification titles, message bodies, senders, OTP codes, or expense details.
 
 ## Data sharing and sale
 
@@ -102,7 +105,7 @@ The current product is not designed or validated as a child-directed service. If
 
 ## Security
 
-Security measures currently include Android application sandboxing, disabled Android app backup, private components for the notification listener/receivers, immutable PendingIntents where used, sensitive clipboard marking where supported, guarded destructive notification cancellation, optional device-credential app lock, and authenticated AES-GCM for password-protected export.
+Security measures currently include Android application sandboxing, disabled Android app backup, a non-exported notification listener and file provider, an exported home-screen widget receiver that exposes only aggregate counts, immutable PendingIntents where used, sensitive clipboard marking where supported, guarded destructive notification cancellation, optional device-credential app lock, and authenticated AES-GCM for password-protected export.
 
 No security mechanism eliminates all risk. Device compromise, root access, screen/notification exposure, clipboard behavior, and user-initiated sharing can affect confidentiality.
 
